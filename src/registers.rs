@@ -1,4 +1,4 @@
-use crate::util::*;
+use crate::{split, combine};
 
 #[derive(Debug)]
 pub struct Registers {
@@ -10,7 +10,7 @@ pub struct Registers {
     pub e: u8,
     pub h: u8,
     pub l: u8,
-    pub pc: u16,
+    pc: u16,
     pub sp: u16,
 }
 impl Default for Registers {
