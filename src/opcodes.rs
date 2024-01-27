@@ -163,35 +163,36 @@ pub fn cp(a: &mut u8, data: u8, f: &mut Flag) {
 
 pub fn jr(cpu: &mut Cpu, cc: bool, change: u8) -> u8 {
     if !cc {
-        return 0;
+        return 8;
     }
     cpu.regs.relative_pc(change as i8);
-    return 4;
+    return 12;
 }
 pub fn jp(cpu: &mut Cpu, cc: bool, new: u16) -> u8 { 
     if !cc {
-        return 0;
+        return 12;
     }
     cpu.regs.set_pc(new);
-    return 4;
+    return 16;
 }
 
 pub fn ret(cpu: &mut Cpu, cc: bool, memory: &mut Memory) -> u8 {
     if !cc {
-        return 4;
+        return 8;
     }
     let new = memory.read_word(cpu.regs.sp);
     cpu.regs.sp += 2;
     cpu.regs.set_pc(new);
-    return 8;
+    return 20;
 }
+
 /// this function adds a memory address to memory and so we need access
 /// to the memory, seems a bit overkill to ask for all memory but I
 /// cannot think of another way to do this. Its just a pointer anyways
 pub fn call(cpu: &mut Cpu, cc: bool, memory: &mut Memory) -> u8 {
     let new_address = memory.read_word(cpu.regs.pc_word());
     if !cc {
-        ;
+        return 12;
     }
     // we jump when we call
     let fallback_address = cpu.regs.pc();
