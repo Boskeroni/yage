@@ -1,3 +1,7 @@
 /target
+/blarggs
 /gameboy-doctor
+/roms
+debug.gb
 *.lock
+justfile
