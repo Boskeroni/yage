@@ -28,8 +28,13 @@ impl Default for Registers {
             sp: 0xFFFE,
         }
     }
+
+  
 }
 impl Registers {
+    pub fn new() -> Self {
+        Self {a: 0, b: 0, c: 0, d: 0, e: 0, f: Flag::from_u8(0), h: 0, l: 0, pc: 0, sp: 0}
+    }
     pub fn set_bc(&mut self, bc: u16) { (self.b, self.c) = split(bc) }
     pub fn get_bc(&self) -> u16 { combine(self.b, self.c) }
 

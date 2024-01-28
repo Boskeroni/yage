@@ -23,7 +23,7 @@ enum PpuRegister {
     // used regularly by the ppu and so should be here too
     IF=0xFF0F
 }
-
+#[derive(Debug)]
 enum PpuState {
     Oam,
     HBlank,
@@ -68,37 +68,35 @@ fn oam_tick(ppu: &mut Ppu, mem: &mut Memory) {
     if ppu.ticks < OAM_CYCLES {
         return;
     }
-
-    let ly = mem.read(PpuRegister::LY as u16);
-
-    // oam scan
-    for i in 0..40 {
-        let oam_sprite = mem.oam_search(i);
-        
-        if oam_sprite[1] == 0 { continue; } // x-position must be greater than 0
-        if ly + 16 < oam_sprite[0] { continue; } // ly+16 must be greater than or equal to sprite y-position
-        if ly + 16 >= oam_sprite[0] + 8 { continue; } // ly+16 must be less than sprite y-position + sprite height
-
-        ppu.oam_buffer.push(oam_sprite);
-
-        if ppu.oam_buffer.len() == 10 { 
-            break; // only the first ten items are wanted
-        }
-    }
     ppu.state = PpuState::Drawing;
 }
-
 fn draw_tick(ppu: &mut Ppu, mem: &mut Memory) -> Option<Vec<u8>> {
     if ppu.ticks < DRAW_CYCLES {
         return None;
     }
 
     // this bit in the middle will do all the drawing
-    let line = draw_scanline(ppu, mem);
+    let lcdc = mem.read(PpuRegister::LCDC as u16);
+
+    // the screen is just off
+    if lcdc & 0b1000_0000 == 0 {
+        return Some(vec![4; 160]);
+    }
+
+    // the number of pixels pushed to the lcd
+    let mut screen_pixels: Vec<u8> = Vec::new();
+
+    let background_pixels = draw_background(mem, lcdc);
+    let bg_pallete = mem.read(PpuRegister::BGP as u16);
+
+    // each pixel is decided sequentially
+    for i in 0..160 {
+        screen_pixels.push(to_pallette(background_pixels[i], bg_pallete))
+    }
 
     stat_interrupt(mem, 3);
     ppu.state = PpuState::HBlank;
-    return Some(line);
+    return Some(screen_pixels);
 }
 
 fn hblank_tick(ppu: &mut Ppu, mem: &mut Memory) {
@@ -107,6 +105,12 @@ fn hblank_tick(ppu: &mut Ppu, mem: &mut Memory) {
     }
 
     let ly = mem.read(PpuRegister::LY as u16);
+    mem.write(PpuRegister::LY as u16, 0);
+
+    // also reset the ticks for next line
+    ppu.ticks = 0;
+
+
     if ly == 144 {
         stat_interrupt(mem, 4);
         ppu.state = PpuState::VBlank;
@@ -115,8 +119,7 @@ fn hblank_tick(ppu: &mut Ppu, mem: &mut Memory) {
 
     stat_interrupt(mem, 5);
     ppu.state = PpuState::Oam;
-    // also reset the ticks for next line
-    ppu.ticks = 0;
+
 }
 
 fn vblank_tick(ppu: &mut Ppu, mem: &mut Memory) {
@@ -138,60 +141,58 @@ fn stat_interrupt(mem: &mut Memory, mode: u8) {
     }
 }
 
-fn draw_scanline(ppu: &mut Ppu, mem: &mut Memory) -> Vec<u8> {
-    let lcdc = mem.read(PpuRegister::LCDC as u16);
-
-    // the screen is just off
-    if lcdc & 0b1000_0000 == 0 {
-        return vec![160; 4];
-    }
-
-    // setting up all the settings from the lcdc
-    let win_map_address = if lcdc & 0b0100_0000 != 0 { 0x9C00 } else { 0x9800 };
-
-    let sprite_size = if lcdc & 0b0000_0100 != 0 { 1 } else { 2 };
-
-    // the number of pixels pushed to the lcd
-    let mut screen_pixels: Vec<u8> = Vec::new();
-
-    let background_pixels = draw_background(mem, lcdc);
-    let window_pixels = draw_window(mem, lcdc);
-
-    let bg_pallete = mem.read(PpuRegister::BGP as u16);
-
-    // each pixel is decided sequentially
-    for i in 0..160 {
-        screen_pixels.push(to_pallette(background_pixels[i], bg_pallete))
-    }
-
-    screen_pixels
-}
 fn to_pallette(index: u8, palette: u8) -> u8 {
+    if index == 4 { return index }
     (palette >> index*2) & 0b0000_0011
+}
+
+fn draw_sprites(mem: &Memory, lcdc: u8) -> Vec<u8> {
+    let ly = mem.read(PpuRegister::LY as u16);
+
+    // oam scan
+    let mut oam_buffer = Vec::new();
+    for i in 0..40 {
+        let oam_sprite = mem.oam_search(i);
+        
+        if oam_sprite[1] == 0 { continue; } // x-position must be greater than 0
+        if ly + 16 < oam_sprite[0] { continue; } // ly+16 must be greater than or equal to sprite y-position
+        if ly + 16 >= oam_sprite[0] + 8 { continue; } // ly+16 must be less than sprite y-position + sprite height
+
+        oam_buffer.push(oam_sprite);
+
+        if oam_buffer.len() == 10 { 
+            break; // only the first ten items are wanted
+        }
+    }
+
+    let mut pixels: Vec<u8> = Vec::new();
+    for sprite in oam_buffer {
+        
+    }
+
+    todo!();
 }
 
 fn draw_window(mem: &Memory, lcdc: u8) -> Vec<u8> {
     if lcdc & 0b0010_0001 == 0 {
-        return vec![5; 160];
+        return vec![4; 160];
     }
     let wy = mem.read(PpuRegister::WY as u16);
     let ly = mem.read(PpuRegister::LY as u16);
 
     // the window will display just not on this line yet
     if wy > ly {
-        return vec![5; 160];
+        return vec![4; 160];
     }
 
     let mut window_pixels = Vec::new();
-
-
 
     return window_pixels;
 }
 
 fn draw_background(mem: &Memory, lcdc: u8) -> Vec<u8> {
     if lcdc & 0b0000_0001 == 0 {
-        return vec![5; 160];
+        return vec![4; 160];
     }
 
     let mut background_pixels = Vec::new();
@@ -220,7 +221,7 @@ fn draw_background(mem: &Memory, lcdc: u8) -> Vec<u8> {
         background_pixels.push((tile_row >> (i*2) & 0b0000_0011) as u8);
     }
     let mut tile_number = 0;
-    loop {
+    while background_pixels.len() != 160 {
         // get the next tile
         tile_number += 1;
         let tile_index = bg_map_address + (bg_tile_row * 32) + (scx/8 + tile_number) % 32;
@@ -230,8 +231,9 @@ fn draw_background(mem: &Memory, lcdc: u8) -> Vec<u8> {
         for i in (0..8).rev() {
             background_pixels.push((tile_row >> (i*2) & 0b0000_0011) as u8);
             if background_pixels.len() == 160 {
-                return background_pixels
+                break;
             }
         }
     }
+    return background_pixels;
 }
