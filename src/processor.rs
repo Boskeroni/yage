@@ -9,7 +9,7 @@ pub struct Cpu {
     ime: bool,
     scheduled_ime: bool,
     stopped: bool,
-    halt: bool,
+    pub halt: bool,
 }
 impl Cpu {
     pub fn new(booted: bool) -> Self {
@@ -31,6 +31,10 @@ impl Cpu {
 /// could be automatically done without needing timer updates
 pub fn handle_interrupts(cpu: &mut Cpu, memory: &mut Memory) {
     let possible_interrupts = memory.read(0xFFFF) & memory.read(0xFF0F);
+
+    if cpu.halt && possible_interrupts != 0 {
+        cpu.halt = false;
+    }
     if !cpu.ime || possible_interrupts == 0 {
         return
     }
@@ -51,6 +55,7 @@ pub fn handle_interrupts(cpu: &mut Cpu, memory: &mut Memory) {
     cpu.ime = false;
     cpu.scheduled_ime = false;
 
+    // unset this interrupt bit
     let new_interrupt = memory.read(0xFF0F) & !(1<<priority);
     memory.write(0xFF0F, new_interrupt);
 }
