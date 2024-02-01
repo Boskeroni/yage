@@ -12,11 +12,22 @@ const HBLANK_CYCLES: usize = 456;
 // this number just represents that no pixel should be here
 const BLANK_PIXEL: u8 = 4;
 
+const STAT_OAM: u8 = 5;
+const STAT_VBLANK: u8 = 4;
+const STAT_HBLANK: u8 = 3;
+
 
 #[inline]
-fn stat_interrupt(mem: &mut Memory, mode: u8) {
-    let stat = mem.read(PpuRegister::STAT as u16);
-    if stat & (1<<mode) != 0 {
+fn stat_interrupt(mem: &mut Memory, interrupt_index: u8, mode: u8) {
+    let mut stat = mem.read(PpuRegister::STAT as u16);
+    stat &= 0b1111_1100;
+    stat |= mode;
+
+    if mode == 3 {
+        return;
+    }
+
+    if stat & (1<<interrupt_index) != 0 {
         let interrupt_flag = mem.read(PpuRegister::IF as u16);
         mem.write(PpuRegister::IF as u16, interrupt_flag|0b0000_0010);
     }
@@ -90,6 +101,7 @@ fn oam_tick(ppu: &mut Ppu, mem: &mut Memory) {
         return;
     }
     ppu.state = PpuState::Drawing;
+    stat_interrupt(mem, 0, 3);
 }
 fn draw_tick(ppu: &mut Ppu, mem: &mut Memory) -> Option<Vec<u8>> {
     if ppu.ticks < DRAW_CYCLES {
@@ -127,7 +139,7 @@ fn draw_tick(ppu: &mut Ppu, mem: &mut Memory) -> Option<Vec<u8>> {
 
     }
 
-    stat_interrupt(mem, 3);
+    stat_interrupt(mem, STAT_HBLANK, 0);
     ppu.state = PpuState::HBlank;
     return Some(screen_pixels);
 }
@@ -144,13 +156,17 @@ fn hblank_tick(ppu: &mut Ppu, mem: &mut Memory) {
 
     if ly == 143 {
         mem.write(PpuRegister::LY as u16, 144);
-        stat_interrupt(mem, 4);
+        stat_interrupt(mem, STAT_VBLANK, 1);
         ppu.state = PpuState::VBlank;
+
+        let i_flag = mem.read(PpuRegister::IF as u16);
+        mem.write(PpuRegister::IF as u16, i_flag|1);
+
         return;
     } 
     mem.write(PpuRegister::LY as u16, ly+1);
 
-    stat_interrupt(mem, 5);
+    stat_interrupt(mem, STAT_OAM, 2);
     ppu.state = PpuState::Oam;
 
 }
@@ -162,7 +178,7 @@ fn vblank_tick(ppu: &mut Ppu, mem: &mut Memory) {
         return;
     }
 
-    stat_interrupt(mem, 5);
+    stat_interrupt(mem, STAT_OAM, 2);
     ppu.state = PpuState::Oam;
     ppu.ticks = 0;
     mem.write(PpuRegister::LY as u16, 0);
@@ -209,8 +225,8 @@ fn draw_sprites(mem: &Memory, lcdc: u8) -> Vec<u8> {
             tile_data.reverse();
         }
 
-        let row_index = ly - (sprite[0] + 8);
-        let mut row_data = tile_data[row_index as usize];
+        let tile_row = ly - (sprite[0] - 16);
+        let mut row_data = tile_data[tile_row as usize];
 
 
         // the sprite is flipped horizontally

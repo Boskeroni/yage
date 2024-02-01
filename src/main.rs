@@ -157,7 +157,6 @@ async fn main() {
                 pixel_buffer.extend::<Vec<u8>>(line);
             }
         }
-
         // all of the actual rendering to the screen
         clear_background(BLACK);
         for (j, pixel) in pixel_buffer.iter().enumerate() {
