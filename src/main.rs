@@ -29,43 +29,50 @@ pub fn split(a: u16) -> (u8, u8) {
 
 
 fn joypad(mem: &mut Memory) {
-    // just some useful testing keys
-    if is_key_pressed(KeyCode::Q) {
-        dump_memory(&mem);
-    }
-
     let mut current_joypad = mem.read(0xFF00);
     let mut button_pressed = false;
-
-
-    if is_key_down(KeyCode::A) {
-        button_pressed = true;
+    let mut arrow_pressed = false;
+    
+    if is_key_down(KeyCode::A) | is_key_down(KeyCode::Right) {
         current_joypad &= 0b1111_1110;
+        button_pressed |= is_key_down(KeyCode::A);
+        println!("{button_pressed}");
+        arrow_pressed |= is_key_down(KeyCode::Right)
     } else {
         current_joypad |= 0b0000_0001;
     }
-    if is_key_down(KeyCode::S) {
-        button_pressed = true;
+    if is_key_down(KeyCode::S) | is_key_down(KeyCode::Left) {
         current_joypad &= 0b1111_1101;
+        button_pressed |= is_key_down(KeyCode::S);
+        arrow_pressed |= is_key_down(KeyCode::Left);
     } else {
         current_joypad |= 0b0000_0010;
     }
-    if is_key_down(KeyCode::Z) {
-        button_pressed = true;
-        current_joypad &= 0b1111_1011
+    if is_key_down(KeyCode::Z) | is_key_down(KeyCode::Up) {
+        current_joypad &= 0b1111_1011;
+        button_pressed |= is_key_down(KeyCode::Z);
+        arrow_pressed |= is_key_down(KeyCode::Up);
     } else {
         current_joypad |= 0b0000_0100;
     }
-    if is_key_down(KeyCode::X) {
-        button_pressed = true;
+    if is_key_down(KeyCode::X) | is_key_down(KeyCode::Down) {
         current_joypad &= 0b1111_0111;
+        button_pressed |= is_key_down(KeyCode::X);
+        arrow_pressed |= is_key_down(KeyCode::Down);
     } else {
         current_joypad |= 0b0000_1000;
     }
-
+    if arrow_pressed { 
+        current_joypad &= 0b1110_1111;
+    } else {
+        current_joypad |= 0b0001_0000;
+    }
     if button_pressed {
         current_joypad &= 0b1101_1111;
+    } else {
+        current_joypad |= 0b0010_0000;
     }
+
     mem.write(0xFF00, current_joypad);
 }
 
@@ -101,12 +108,13 @@ fn dump_memory(mem: &Memory) {
     debug_file.write_all(&mem.mem).unwrap();
 }
 
+const SCALE_FACTOR: i32 = 3;
 fn window_conf() -> Conf {
     Conf {
         window_title: "gameboy emulator".to_owned(),
         window_resizable: false,
-        window_height: 144,
-        window_width: 160,
+        window_height: 144*SCALE_FACTOR,
+        window_width: 160*SCALE_FACTOR,
         ..Default::default()
     }
 }
@@ -149,7 +157,6 @@ async fn main() {
             joypad(&mut memory);
             handle_interrupts(&mut cpu, &mut memory);
 
-
             // just useful for any outputs some roms may have
             serial_output(&mut memory);
 
@@ -162,10 +169,10 @@ async fn main() {
         for (j, pixel) in pixel_buffer.iter().enumerate() {
             let pixel = to_screen_pixel(*pixel);
             draw_rectangle(
-                (j%160) as f32, //pos
-                (j/160) as f32, //pos
-                1., //width
-                1., //height
+                ((j%160)*SCALE_FACTOR as usize) as f32, //pos
+                ((j/160)*SCALE_FACTOR as usize) as f32, //pos
+                SCALE_FACTOR as f32, //width
+                SCALE_FACTOR as f32, //height
                 pixel // color
             );
         }
