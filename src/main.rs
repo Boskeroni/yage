@@ -84,7 +84,7 @@ fn to_screen_pixel(p: u8) -> Color {
         2 => return DARKGRAY,
         3 => return BLACK,
         // error color
-        4 => return YELLOW,
+        4 => return BLANK,
         _ => unreachable!()
     }
 }
@@ -160,7 +160,6 @@ async fn main() {
 
         // all of the actual rendering to the screen
         clear_background(BLACK);
-        println!("{}", pixel_buffer.len());
         for (j, pixel) in pixel_buffer.iter().enumerate() {
             let pixel = to_screen_pixel(*pixel);
             draw_rectangle(
@@ -173,12 +172,10 @@ async fn main() {
         }
         pixel_buffer.clear();
         next_frame().await;
-    
+
         thread::sleep(Duration::from_millis(60));
 
         // debug section of the emulator
-
-
         if !booted && cpu.regs.pc == 0xE9 {
             dump_memory(&memory);
             break 'full;

@@ -22,7 +22,7 @@ fn stat_interrupt(mem: &mut Memory, mode: u8) {
     }
 }
 
-fn to_pallette(index: u8, palette: u8) -> u8 {
+fn to_palette(index: u8, palette: u8) -> u8 {
     if index == 4 { return index }
     let lcdc_color = (palette >> index*2) & 0b0000_0011;
     lcdc_color
@@ -108,17 +108,21 @@ fn draw_tick(ppu: &mut Ppu, mem: &mut Memory) -> Option<Vec<u8>> {
     let mut screen_pixels: Vec<u8> = Vec::new();
 
     let background_pixels = draw_background(mem, lcdc);
-    let bg_pallete = mem.read(PpuRegister::BGP as u16);
+    let window_pixels = draw_window(mem, lcdc);
+
+    // also the palle
+    let bg_palette = mem.read(PpuRegister::BGP as u16);
 
     let sprite_pixels = draw_sprites(mem, lcdc);
     let sprite_palette = mem.read(PpuRegister::OBP0 as u16);
 
+
     // each pixel is decided sequentially
     for i in 0..160 {
         if sprite_pixels[i] != 0 && sprite_pixels[i] != BLANK_PIXEL {
-            screen_pixels.push(to_pallette(sprite_pixels[i], sprite_palette))
+            screen_pixels.push(to_palette(sprite_pixels[i], sprite_palette))
         } else {
-            screen_pixels.push(to_pallette(background_pixels[i], bg_pallete))
+            screen_pixels.push(to_palette(background_pixels[i], bg_palette))
         }
     }
 
@@ -137,12 +141,12 @@ fn hblank_tick(ppu: &mut Ppu, mem: &mut Memory) {
     // also reset the ticks for next line
     ppu.ticks = 0;
 
-    if ly == 144 {
+    if ly == 143 {
+        mem.write(PpuRegister::LY as u16, 144);
         stat_interrupt(mem, 4);
         ppu.state = PpuState::VBlank;
         return;
-    }
-
+    } 
     mem.write(PpuRegister::LY as u16, ly+1);
 
     stat_interrupt(mem, 5);
@@ -156,10 +160,10 @@ fn vblank_tick(ppu: &mut Ppu, mem: &mut Memory) {
         return;
     }
 
-    mem.write(PpuRegister::LY as u16, 0);
     stat_interrupt(mem, 5);
     ppu.state = PpuState::Oam;
     ppu.ticks = 0;
+    mem.write(PpuRegister::LY as u16, 0);
 }
 
 fn draw_sprites(mem: &Memory, lcdc: u8) -> Vec<u8> {
@@ -303,7 +307,7 @@ fn draw_background(mem: &Memory, lcdc: u8) -> Vec<u8> {
 
     let tile = mem.read_bg_tile(tile_index, tile_addressing);
     let tile_row = tile[background_line as usize % 8]; 
-    let pixels_shown = scx%8;
+    let pixels_shown = 8-(scx%8);
 
     for i in (0..pixels_shown).rev() {
         background_pixels.push((tile_row >> (i*2) & 0b0000_0011) as u8);
