@@ -7,7 +7,7 @@ mod opcodes;
 mod gpu;
 mod timer;
 
-use std::{env, fs::File, io::Write, thread, time::Duration};
+use std::{env, fs::File, io::Write};
 
 use processor::{Cpu, handle_interrupts};
 use gpu::{Ppu, update_ppu};
@@ -136,6 +136,7 @@ async fn main() {
 
     'full: loop {
         while pixel_buffer.len() != 23040 {
+            println!("{:#02X}", cpu.regs.pc);
             if cpu.regs.pc == 0x100 && !booted {
                 break 'full;
             }
@@ -172,8 +173,6 @@ async fn main() {
         }
         pixel_buffer.clear();
         next_frame().await;
-
-        thread::sleep(Duration::from_millis(60));
 
         // debug section of the emulator
         if !booted && cpu.regs.pc == 0xE9 {

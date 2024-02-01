@@ -120,10 +120,11 @@ fn draw_tick(ppu: &mut Ppu, mem: &mut Memory) -> Option<Vec<u8>> {
     // each pixel is decided sequentially
     for i in 0..160 {
         if sprite_pixels[i] != 0 && sprite_pixels[i] != BLANK_PIXEL {
-            screen_pixels.push(to_palette(sprite_pixels[i], sprite_palette))
-        } else {
-            screen_pixels.push(to_palette(background_pixels[i], bg_palette))
+            screen_pixels.push(to_palette(sprite_pixels[i], sprite_palette));
+            continue;
         }
+        screen_pixels.push(to_palette(background_pixels[i], bg_palette));
+
     }
 
     stat_interrupt(mem, 3);
@@ -157,6 +158,7 @@ fn hblank_tick(ppu: &mut Ppu, mem: &mut Memory) {
 fn vblank_tick(ppu: &mut Ppu, mem: &mut Memory) {
     // ten full lines wil have to be drawn
     if ppu.ticks < HBLANK_CYCLES*10 {
+        mem.write(PpuRegister::LY as u16, 144+(ppu.ticks/HBLANK_CYCLES) as u8);
         return;
     }
 
@@ -265,7 +267,7 @@ fn draw_sprites(mem: &Memory, lcdc: u8) -> Vec<u8> {
 
 fn draw_window(mem: &Memory, lcdc: u8) -> Vec<u8> {
     // the window just isnt drawing
-    if lcdc & 0b0010_0001 == 0 {
+    if lcdc & 0b0010_0001 != 0b0010_0001 {
         return vec![BLANK_PIXEL; 160];
     }
 
@@ -277,9 +279,35 @@ fn draw_window(mem: &Memory, lcdc: u8) -> Vec<u8> {
         return vec![BLANK_PIXEL; 160];
     }
 
-    let mut window_pixels: Vec<u8> = Vec::new();
+    let wx = mem.read(PpuRegister::WX as u16);
+    let map_address = if lcdc & 0b0100_0000 != 0 { 0x9C00 } else { 0x9800 };
+    let addressing = if lcdc & 0b0001_0000 != 0 { 0x8000 } else { 0x8800 };
 
-    todo!();
+    let mut window_pixels: Vec<u8> = vec![BLANK_PIXEL; wx as usize];
+
+    // 0 = top layer, 1 = second to top, 2=...
+    let layer_shown = (wy - ly) as usize;
+    let tile_row = layer_shown as u16 / 8;
+    let starting_address = map_address + (tile_row/8)*32;
+
+    let mut tile_number = 0;
+
+    'window: loop {
+        // dont need to bother with wrapping as windows do not wrap
+        let tile_address = starting_address + tile_number;
+        let tile_data = mem.read_bg_tile(tile_address, addressing);
+        let tile_row_data = tile_data[layer_shown % 8];
+
+        for i in (0..8).rev() {
+            window_pixels.push((tile_row >> (i*2) & 0b0000_0011) as u8);
+            if window_pixels.len() == 167 {
+                break 'window;
+            }
+        }
+
+        tile_number += 1;
+    }
+    return window_pixels[7..].to_vec();
 }
 
 fn draw_background(mem: &Memory, lcdc: u8) -> Vec<u8> {
@@ -289,8 +317,8 @@ fn draw_background(mem: &Memory, lcdc: u8) -> Vec<u8> {
 
     let mut background_pixels = Vec::new();
 
-    let bg_map_address = if lcdc & 0b0000_1000 != 0 { 0x9C00 } else { 0x9800 };
-    let tile_addressing: u16 = if lcdc & 0b0001_0000 != 0 { 0x8000 } else { 0x8800 };
+    let map_address = if lcdc & 0b0000_1000 != 0 { 0x9C00 } else { 0x9800 };
+    let addressing: u16 = if lcdc & 0b0001_0000 != 0 { 0x8000 } else { 0x8800 };
 
     let ly = mem.read(PpuRegister::LY as u16);
 
@@ -300,30 +328,35 @@ fn draw_background(mem: &Memory, lcdc: u8) -> Vec<u8> {
     // which row of each tile is being used
     let tile_row = background_line % 8;
 
-    // this tile may not be fully displayed and so i will deal with it seperately
     let scx = mem.read(PpuRegister::SCX as u16) as u16;
 
-    let tile_index = bg_map_address + (bg_tile_row * 32) + (scx / 8);
 
-    let tile = mem.read_bg_tile(tile_index, tile_addressing);
-    let tile_row = tile[background_line as usize % 8]; 
-    let pixels_shown = 8-(scx%8);
+    // this tile may not be fully displayed and so i will deal with it seperately
+    {
+        let tile_index = map_address + (bg_tile_row * 32) + (scx / 8);
 
-    for i in (0..pixels_shown).rev() {
-        background_pixels.push((tile_row >> (i*2) & 0b0000_0011) as u8);
+        let tile = mem.read_bg_tile(tile_index, addressing);
+        let tile_row = tile[background_line as usize % 8]; 
+        let pixels_shown = 8-(scx%8);
+    
+        for i in (0..pixels_shown).rev() {
+            background_pixels.push((tile_row >> (i*2) & 0b0000_0011) as u8);
+        }
     }
+
+    // the rest of the tiles
     let mut tile_number = 0;
-    while background_pixels.len() != 160 {
+    'background: loop {
         // get the next tile
         tile_number += 1;
-        let tile_index = bg_map_address + (bg_tile_row * 32) + (scx/8 + tile_number) % 32;
-        let tile = mem.read_bg_tile(tile_index, tile_addressing);
+        let tile_index = map_address + (bg_tile_row * 32) + (scx/8 + tile_number) % 32;
+        let tile = mem.read_bg_tile(tile_index, addressing);
         let tile_row = tile[background_line as usize % 8];
         
         for i in (0..8).rev() {
             background_pixels.push((tile_row >> (i*2) & 0b0000_0011) as u8);
             if background_pixels.len() == 160 {
-                break;
+                break 'background;
             }
         }
     }

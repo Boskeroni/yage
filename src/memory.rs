@@ -8,8 +8,6 @@ const NINTENDO_LOGO: [u8; 48] =
 pub struct Memory {
     pub mem: Vec<u8>,
     pub div: u8,
-    dma: bool,
-    dma_address: u16,
 }
 impl Memory {
     pub fn new_unbooted(rom: Vec<u8>) -> Self {
@@ -25,7 +23,7 @@ impl Memory {
             memory[0x104 + i] = *val;
         }
 
-        Self { mem: memory, div: 0, dma: false, dma_address: 0 }
+        Self { mem: memory, div: 0 }
     }
 
     pub fn new(rom: Vec<u8>, booted: bool) -> Self {
@@ -53,13 +51,13 @@ impl Memory {
     pub fn write(&mut self, address: u16, data: u8) {
         let address = address as usize;
         if address < 0x8000 {
-            panic!("cannot handle swapping yet, {address}");
+            println!("cannot handle swapping yet, {address}");
+            return;
         }
 
         if address == 0xFF46 {
-            println!("dma has been called");
-            self.dma = true;
-            self.dma_address = data as u16 * 0x100;
+            println!("dma has been called {data:#02X}");
+            process_dma(self, data);
         }
 
         // only the second bit of the stat register matter
@@ -156,6 +154,13 @@ impl Memory {
             tile_data.push(line_data);
         }
         tile_data.try_into().unwrap()
+    }
+}
+
+fn process_dma(mem: &mut Memory, address: u8) {
+    let real_address = (address as usize) << 8;
+    for i in 0..0x100 {
+        mem.mem[0xFE00+i] = mem.mem[real_address+i];
     }
 }
 
