@@ -132,11 +132,10 @@ async fn main() {
     let mut memory = Memory::new(get_rom(rom_path), booted);
     let mut ppu = Ppu::default();
 
-    let mut current_line = 0;
     let mut pixel_buffer: Vec<u8> = Vec::new();
 
     'full: loop {
-        while current_line != 144 {
+        while pixel_buffer.len() != 23040 {
             if cpu.regs.pc == 0x100 && !booted {
                 break 'full;
             }
@@ -156,7 +155,6 @@ async fn main() {
 
             if let Some(line) = update_ppu(&mut ppu, &mut memory, cycles) {
                 pixel_buffer.extend::<Vec<u8>>(line);
-                current_line+=1;
             }
         }
 
@@ -173,7 +171,6 @@ async fn main() {
                 pixel // color
             );
         }
-        current_line = 0;
         pixel_buffer.clear();
         next_frame().await;
     
