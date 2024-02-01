@@ -136,7 +136,6 @@ async fn main() {
 
     'full: loop {
         while pixel_buffer.len() != 23040 {
-            println!("{:#02X}", cpu.regs.pc);
             if cpu.regs.pc == 0x100 && !booted {
                 break 'full;
             }

@@ -50,6 +50,10 @@ impl Memory {
     /// eventually implement them
     pub fn write(&mut self, address: u16, data: u8) {
         let address = address as usize;
+        if address == 0xFF0F {
+            println!("{data}");
+        }
+
         if address < 0x8000 {
             println!("cannot handle swapping yet, {address}");
             return;
