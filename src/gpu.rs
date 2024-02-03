@@ -1,23 +1,10 @@
-#![allow(unused, dead_code)]
 use std::usize;
-
-use macroquad::miniquad::window;
-
 use crate::memory::Memory;
-
-/// how many ppu dots each cycle takes
-/// includes the amount from the previous mode
-const OAM_CYCLES: usize = 80;
-const DRAW_CYCLES: usize = 178;
-const HBLANK_CYCLES: usize = 456;
+use crate::util::ppu::*;
+use crate::util::INTERRUPT_FLAG_ADDRESS;
 
 // this number just represents that no pixel should be here
-const BLANK_PIXEL: u8 = 4;
-
-const STAT_OAM: u8 = 5;
-const STAT_VBLANK: u8 = 4;
-const STAT_HBLANK: u8 = 3;
-
+pub const BLANK_PIXEL: u8 = 4;
 
 #[inline]
 fn stat_interrupt(mem: &mut Memory, interrupt_index: u8, mode: u8) {
@@ -30,13 +17,13 @@ fn stat_interrupt(mem: &mut Memory, interrupt_index: u8, mode: u8) {
     }
 
     if stat & (1<<interrupt_index) != 0 {
-        let interrupt_flag = mem.read(PpuRegister::IF as u16);
-        mem.write(PpuRegister::IF as u16, interrupt_flag|0b0000_0010);
+        let interrupt_flag = mem.read(INTERRUPT_FLAG_ADDRESS as u16);
+        mem.write(INTERRUPT_FLAG_ADDRESS as u16, interrupt_flag|0b0000_0010);
     }
 
     if mode == 1 {
-        let i_flag = mem.read(PpuRegister::IF as u16);
-        mem.write(PpuRegister::IF as u16, i_flag|1);
+        let i_flag = mem.read(INTERRUPT_FLAG_ADDRESS as u16);
+        mem.write(INTERRUPT_FLAG_ADDRESS as u16, i_flag|1);
     }
 }
 
@@ -46,22 +33,6 @@ fn to_palette(index: u8, palette: u8) -> u8 {
     lcdc_color
 }
 
-enum PpuRegister {
-    LCDC=0xFF40,
-    STAT=0xFF41,
-    SCY=0xFF42,
-    SCX=0xFF43,
-    LY=0xFF44,
-    LYC=0xFF45,
-    BGP=0xFF47,
-    OBP0=0xFF48,
-    OBP1=0xFF49,
-    WY=0xFF4A,
-    WX=0xFF4B,
-    // this is more of an interrupt register but is still
-    // used regularly by the ppu and so should be here too
-    IF=0xFF0F
-}
 #[derive(Debug)]
 enum PpuState {
     Oam,
@@ -82,18 +53,21 @@ impl Default for Ppu {
         }
     }
 }
-impl Ppu {
-    fn reset(&mut self) {
-        *self = Ppu::default();
-    }
-}
-
 
 /// updates the ppu, called in between instructions
 pub fn update_ppu(ppu: &mut Ppu, mem: &mut Memory, ticks: u8) -> Option<Vec<u8>> {
     use PpuState::*;
-    ppu.ticks += ticks as usize;
+    // lyc == ly check should be done right at the start
+    if ppu.ticks == 0 && (mem.read(PpuRegister::STAT as u16) & 0b0100_0000) != 0 {
+        let lyc = mem.read(PpuRegister::LYC as u16);
+        let ly = mem.read(PpuRegister::LY as u16);
+        if lyc == ly {
+            let stat = mem.read(PpuRegister::STAT as u16);
+            mem.write(PpuRegister::STAT as u16, stat|0b0000_0100);
+        }
+    }
 
+    ppu.ticks += ticks as usize;
     match ppu.state {
         Oam => {
             if ppu.ticks < OAM_CYCLES {

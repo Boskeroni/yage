@@ -1,5 +1,5 @@
 use rand::{distributions::Standard, Rng};
-use crate::little_endian_combine;
+use crate::util::little_endian_combine;
 
 // just helps with boot rom not failing the check
 const NINTENDO_LOGO: [u8; 48] = 

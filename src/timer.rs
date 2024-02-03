@@ -1,11 +1,5 @@
 use crate::memory::Memory;
-
-enum TimerRegisters {
-    DIV=0xFF04,
-    TIMA=0xFF05,
-    TMA=0xFF06,
-    TAC=0xFF07,
-}
+use crate::util::TimerRegisters;
 
 pub fn update_timer(memory: &mut Memory, cycles: u8) {
     use TimerRegisters::*;

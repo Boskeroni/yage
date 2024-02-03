@@ -1,43 +1,33 @@
-#![allow(unused, dead_code)]
-
 mod processor;
 mod registers;
 mod memory;
 mod opcodes;
 mod gpu;
 mod timer;
+mod util;
 
 use core::panic;
 use std::{env, fs::File, io::Write};
+use macroquad::prelude::*;
 
+use util::{JOYPAD_ADDRESS, INTERRUPT_FLAG_ADDRESS};
 use processor::{Cpu, handle_interrupts};
 use gpu::{Ppu, update_ppu};
 use memory::Memory;
 use processor::run;
 use timer::update_timer;
 
-use macroquad::prelude::*;
-
-pub fn little_endian_combine(a: u8, b: u8) -> u16 {
-    (b as u16) << 8 | (a as u16)
-}
-pub fn combine(a: u8, b: u8) -> u16 {
-    (a as u16) << 8 | b as u16
-}
-pub fn split(a: u16) -> (u8, u8) {
-    (((a & 0xFF00) >> 8) as u8, (a & 0xFF) as u8)
-}
-
-const JOYPAD_ADDRESS: u16 = 0xFF00;
-const INTERRUPT_ADDRESS: u16 = 0xFF0F;
 
 fn joypad(mem: &mut Memory) {
     let mut current_joypad = mem.read(JOYPAD_ADDRESS);
+    let old_joypad = current_joypad;
+    
     let mut pressed = false;
 
-
+    
 
     mem.unchecked_write(JOYPAD_ADDRESS, current_joypad);
+    todo!();
 }
 
 fn serial_output(mem: &mut Memory) {

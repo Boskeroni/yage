@@ -1,4 +1,4 @@
-use crate::{split, combine};
+use crate::util::{split, combine};
 
 #[derive(Debug)]
 pub struct Registers {
