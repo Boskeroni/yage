@@ -1,13 +1,14 @@
 use rand::{distributions::Standard, Rng};
 use crate::little_endian_combine;
 
+// just helps with boot rom not failing the check
 const NINTENDO_LOGO: [u8; 48] = 
     [0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D,
      0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99,
      0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E
 ];
 
-
+// makes the ram random, more accurate to the gameboy
 fn random_padding(amount: usize) -> Vec<u8> {
     rand::thread_rng().sample_iter(Standard).take(amount).collect()
 }
@@ -62,6 +63,13 @@ impl Memory {
             return;
         }
 
+        // only the upper bits of joypad register are writable
+        if address == 0xFF00 {
+            let new = (data & 0xF0) | (self.mem[0xFF00] & 0x0F);
+            self.mem[0xFF00] =  new;
+            return;
+        }
+
         if address == 0xFF46 {
             process_dma(self, data);
         }
@@ -75,7 +83,7 @@ impl Memory {
         }
 
         // the internal DIV 
-        if address == 0xFF05 {
+        if address == 0xFF04 {
             self.div = 0;
             self.mem[0xFF04] = 0x00;
             return;
@@ -104,6 +112,10 @@ impl Memory {
     pub fn read(&self, address: u16) -> u8 {
         let address = address as usize;
 
+        if address == 0xFF00 {
+            return self.mem[address];
+        }
+
         // only the second bit of the stat register matter
         let blocker = self.mem[0xFF41] & 0b0000_0011;
         if blocker == 2 && is_within_oam(address) {
@@ -112,7 +124,7 @@ impl Memory {
             return 0xFF;
         }
 
-        self.mem[address as usize]
+        self.mem[address]
     }
 
     /// just makes reading 16-bits of data more convenient
@@ -165,7 +177,7 @@ impl Memory {
 
 fn process_dma(mem: &mut Memory, address: u8) {
     let real_address = (address as usize) << 8;
-    for i in 0..0x100 {
+    for i in 0..=0xFF {
         mem.mem[0xFE00+i] = mem.mem[real_address+i];
     }
 }

@@ -1,4 +1,4 @@
-//#![allow(unused, dead_code)]
+#![allow(unused, dead_code)]
 
 mod processor;
 mod registers;
@@ -7,6 +7,7 @@ mod opcodes;
 mod gpu;
 mod timer;
 
+use core::panic;
 use std::{env, fs::File, io::Write};
 
 use processor::{Cpu, handle_interrupts};
@@ -27,53 +28,16 @@ pub fn split(a: u16) -> (u8, u8) {
     (((a & 0xFF00) >> 8) as u8, (a & 0xFF) as u8)
 }
 
+const JOYPAD_ADDRESS: u16 = 0xFF00;
+const INTERRUPT_ADDRESS: u16 = 0xFF0F;
 
 fn joypad(mem: &mut Memory) {
-    let mut current_joypad = mem.read(0xFF00);
-    let mut button_pressed = false;
-    let mut arrow_pressed = false;
-    
-    if is_key_down(KeyCode::A) | is_key_down(KeyCode::Right) {
-        current_joypad &= 0b1111_1110;
-        button_pressed |= is_key_down(KeyCode::A);
-        println!("{button_pressed}");
-        arrow_pressed |= is_key_down(KeyCode::Right)
-    } else {
-        current_joypad |= 0b0000_0001;
-    }
-    if is_key_down(KeyCode::S) | is_key_down(KeyCode::Left) {
-        current_joypad &= 0b1111_1101;
-        button_pressed |= is_key_down(KeyCode::S);
-        arrow_pressed |= is_key_down(KeyCode::Left);
-    } else {
-        current_joypad |= 0b0000_0010;
-    }
-    if is_key_down(KeyCode::Z) | is_key_down(KeyCode::Up) {
-        current_joypad &= 0b1111_1011;
-        button_pressed |= is_key_down(KeyCode::Z);
-        arrow_pressed |= is_key_down(KeyCode::Up);
-    } else {
-        current_joypad |= 0b0000_0100;
-    }
-    if is_key_down(KeyCode::X) | is_key_down(KeyCode::Down) {
-        current_joypad &= 0b1111_0111;
-        button_pressed |= is_key_down(KeyCode::X);
-        arrow_pressed |= is_key_down(KeyCode::Down);
-    } else {
-        current_joypad |= 0b0000_1000;
-    }
-    if arrow_pressed { 
-        current_joypad &= 0b1110_1111;
-    } else {
-        current_joypad |= 0b0001_0000;
-    }
-    if button_pressed {
-        current_joypad &= 0b1101_1111;
-    } else {
-        current_joypad |= 0b0010_0000;
-    }
+    let mut current_joypad = mem.read(JOYPAD_ADDRESS);
+    let mut pressed = false;
 
-    mem.write(0xFF00, current_joypad);
+
+
+    mem.unchecked_write(JOYPAD_ADDRESS, current_joypad);
 }
 
 fn serial_output(mem: &mut Memory) {
@@ -148,6 +112,7 @@ async fn main() {
                 break 'full;
             }
 
+            handle_interrupts(&mut cpu, &mut memory);
             let mut cycles = 4;
             if !cpu.halt {
                 cycles = run(&mut cpu, &mut memory);
@@ -155,7 +120,6 @@ async fn main() {
 
             update_timer(&mut memory, cycles);
             joypad(&mut memory);
-            handle_interrupts(&mut cpu, &mut memory);
 
             // just useful for any outputs some roms may have
             serial_output(&mut memory);

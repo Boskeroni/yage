@@ -34,6 +34,7 @@ pub fn handle_interrupts(cpu: &mut Cpu, memory: &mut Memory) {
 
     if cpu.halt && possible_interrupts != 0 {
         cpu.halt = false;
+        return;
     }
     if !cpu.ime || possible_interrupts == 0 {
         return
@@ -79,73 +80,82 @@ pub fn run(cpu: &mut Cpu, memory: &mut Memory) -> u8 {
     return used_cycles;
 }
 
-fn unprefixed_opcode(cpu: &mut Cpu, memory: &mut Memory, opcode: u8) -> u8 {
+fn unprefixed_opcode(cpu: &mut Cpu, mem: &mut Memory, opcode: u8) -> u8 {
     match opcode {
         0x00 => { return 4}
-        0x01 => {let pc = cpu.regs.pc_word(); cpu.regs.set_bc(memory.read_word(pc)); return 12},
-        0x02 => {memory.write(cpu.regs.get_bc(), cpu.regs.a); return 8},
+        0x01 => {let pc = cpu.regs.pc_word(); cpu.regs.set_bc(mem.read_word(pc)); return 12},
+        0x02 => {mem.write(cpu.regs.get_bc(), cpu.regs.a); return 8},
         0x03 => {cpu.regs.set_bc(cpu.regs.get_bc().wrapping_add(1)); return 8},
         0x04 => {inc(&mut cpu.regs.b, &mut cpu.regs.f); return 4},
         0x05 => {dec(&mut cpu.regs.b, &mut cpu.regs.f); return 4},
-        0x06 => {cpu.regs.b = memory.read(cpu.regs.pc()); return 8},
+        0x06 => {cpu.regs.b = mem.read(cpu.regs.pc()); return 8},
         0x07 => {rlc(&mut cpu.regs.a, &mut cpu.regs.f); cpu.regs.f.set_z(false); return 4}
-        0x08 => {let addr = memory.read_word(cpu.regs.pc_word()); memory.write_word(addr, cpu.regs.sp); return 20},
+        0x08 => {let addr = mem.read_word(cpu.regs.pc_word()); mem.write_word(addr, cpu.regs.sp); return 20},
         0x09 => {let hl = add_u16(cpu.regs.get_hl(), cpu.regs.get_bc(), &mut cpu.regs.f); cpu.regs.set_hl(hl); return 8},
-        0x0A => {cpu.regs.a = memory.read(cpu.regs.get_bc()); return 8},
+        0x0A => {cpu.regs.a = mem.read(cpu.regs.get_bc()); return 8},
         0x0B => {cpu.regs.set_bc(cpu.regs.get_bc().wrapping_sub(1)); return 8},
         0x0C => {inc(&mut cpu.regs.c, &mut cpu.regs.f); return 4},
         0x0D => {dec(&mut cpu.regs.c, &mut cpu.regs.f); return 4},
-        0x0E => {cpu.regs.c = memory.read(cpu.regs.pc()); return 8},
+        0x0E => {cpu.regs.c = mem.read(cpu.regs.pc()); return 8},
         0x0F => {rrc(&mut cpu.regs.a, &mut cpu.regs.f); cpu.regs.f.set_z(false); return 4}
-        0x10 => {cpu.stopped = true; cpu.regs.pc(); memory.write(0xFF05, 0); return 4} 
-        0x11 => {let pc = cpu.regs.pc_word(); cpu.regs.set_de(memory.read_word(pc)); return 12},
-        0x12 => {memory.write(cpu.regs.get_de(), cpu.regs.a); return 8},
+        0x10 => {cpu.stopped = true; cpu.regs.pc(); mem.write(0xFF05, 0); return 4} 
+        0x11 => {let pc = cpu.regs.pc_word(); cpu.regs.set_de(mem.read_word(pc)); return 12},
+        0x12 => {mem.write(cpu.regs.get_de(), cpu.regs.a); return 8},
         0x13 => {cpu.regs.set_de(cpu.regs.get_de().wrapping_add(1)); return 8},
         0x14 => {inc(&mut cpu.regs.d, &mut cpu.regs.f); return 4},
         0x15 => {dec(&mut cpu.regs.d, &mut cpu.regs.f); return 4},
-        0x16 => {cpu.regs.d = memory.read(cpu.regs.pc()); return 8},
+        0x16 => {cpu.regs.d = mem.read(cpu.regs.pc()); return 8},
         0x17 => {rl(&mut cpu.regs.a, &mut cpu.regs.f); cpu.regs.f.set_z(false); return 4}
-        0x18 => {let new = memory.read(cpu.regs.pc()); jr(cpu, true, new); return 12},
+        0x18 => {let new = mem.read(cpu.regs.pc()); jr(cpu, true, new); return 12},
         0x19 => {let hl = add_u16(cpu.regs.get_hl(), cpu.regs.get_de(), &mut cpu.regs.f); cpu.regs.set_hl(hl); return 8;},
-        0x1A => {cpu.regs.a = memory.read(cpu.regs.get_de()); return 8},
+        0x1A => {cpu.regs.a = mem.read(cpu.regs.get_de()); return 8},
         0x1B => {cpu.regs.set_de(cpu.regs.get_de().wrapping_sub(1)); return 8},
         0x1C => {inc(&mut cpu.regs.e, &mut cpu.regs.f); return 4},
         0x1D => {dec(&mut cpu.regs.e, &mut cpu.regs.f); return 4},
-        0x1E => {cpu.regs.e = memory.read(cpu.regs.pc()); return 8},
+        0x1E => {cpu.regs.e = mem.read(cpu.regs.pc()); return 8},
         0x1F => {rr(&mut cpu.regs.a, &mut cpu.regs.f); cpu.regs.f.set_z(false); return 4}
-        0x20 => {let new = memory.read(cpu.regs.pc()); let cycles = jr(cpu, !cpu.regs.f.z(), new); return cycles}, 
-        0x21 => {let pc = cpu.regs.pc_word(); cpu.regs.set_hl(memory.read_word(pc)); return 12},
-        0x22 => {memory.write(cpu.regs.get_hli(), cpu.regs.a); return 8},
+        0x20 => {let new = mem.read(cpu.regs.pc()); let cycles = jr(cpu, !cpu.regs.f.z(), new); return cycles}, 
+        0x21 => {let pc = cpu.regs.pc_word(); cpu.regs.set_hl(mem.read_word(pc)); return 12},
+        0x22 => {mem.write(cpu.regs.get_hli(), cpu.regs.a); return 8},
         0x23 => {cpu.regs.get_hli(); return 8},
         0x24 => {inc(&mut cpu.regs.h, &mut cpu.regs.f); return 4},
         0x25 => {dec(&mut cpu.regs.h, &mut cpu.regs.f); return 4},
-        0x26 => {cpu.regs.h = memory.read(cpu.regs.pc()); return 8},
+        0x26 => {cpu.regs.h = mem.read(cpu.regs.pc()); return 8},
         0x27 => {daa(&mut cpu.regs.a, &mut cpu.regs.f); return 4},
-        0x28 => {let new = memory.read(cpu.regs.pc()); let cycles = jr(cpu, cpu.regs.f.z(), new); return cycles},
+        0x28 => {let new = mem.read(cpu.regs.pc()); let cycles = jr(cpu, cpu.regs.f.z(), new); return cycles},
         0x29 => {let hl = add_u16(cpu.regs.get_hl(), cpu.regs.get_hl(), &mut cpu.regs.f); cpu.regs.set_hl(hl); return 8},
-        0x2A => {cpu.regs.a = memory.read(cpu.regs.get_hli()); return 8},
+        0x2A => {cpu.regs.a = mem.read(cpu.regs.get_hli()); return 8},
         0x2B => {cpu.regs.get_hld(); return 8},
         0x2C => {inc(&mut cpu.regs.l, &mut cpu.regs.f); return 4},
         0x2D => {dec(&mut cpu.regs.l, &mut cpu.regs.f); return 4},
-        0x2E => {cpu.regs.l = memory.read(cpu.regs.pc()); return 8},
+        0x2E => {cpu.regs.l = mem.read(cpu.regs.pc()); return 8},
         0x2F => {cpl(&mut cpu.regs.a, &mut cpu.regs.f); return 4},
-        0x30 => {let new = memory.read(cpu.regs.pc()); let cycles = jr(cpu, !cpu.regs.f.c(), new); return cycles},
-        0x31 => {cpu.regs.sp = memory.read_word(cpu.regs.pc_word()); return 12},
-        0x32 => {memory.write(cpu.regs.get_hld(), cpu.regs.a); return 8},
+        0x30 => {let new = mem.read(cpu.regs.pc()); let cycles = jr(cpu, !cpu.regs.f.c(), new); return cycles},
+        0x31 => {cpu.regs.sp = mem.read_word(cpu.regs.pc_word()); return 12},
+        0x32 => {mem.write(cpu.regs.get_hld(), cpu.regs.a); return 8},
         0x33 => {cpu.regs.sp = cpu.regs.sp.wrapping_add(1); return 8},
-        0x34 => {let mut hl = memory.read(cpu.regs.get_hl()); inc(&mut hl, &mut cpu.regs.f); memory.write(cpu.regs.get_hl(), hl); return 12},
-        0x35 => {let mut hl = memory.read(cpu.regs.get_hl()); dec(&mut hl, &mut cpu.regs.f); memory.write(cpu.regs.get_hl(), hl); return 12},
-        0x36 => {let new = memory.read(cpu.regs.pc()); memory.write(cpu.regs.get_hl(), new); return 12},
+        0x34 => {let mut hl = mem.read(cpu.regs.get_hl()); inc(&mut hl, &mut cpu.regs.f); mem.write(cpu.regs.get_hl(), hl); return 12},
+        0x35 => {let mut hl = mem.read(cpu.regs.get_hl()); dec(&mut hl, &mut cpu.regs.f); mem.write(cpu.regs.get_hl(), hl); return 12},
+        0x36 => {let new = mem.read(cpu.regs.pc()); mem.write(cpu.regs.get_hl(), new); return 12},
         0x37 => {scf(&mut cpu.regs.f); return 4},
-        0x38 => {let new = memory.read(cpu.regs.pc()); let cycles = jr(cpu, cpu.regs.f.c(), new); return cycles},
+        0x38 => {let new = mem.read(cpu.regs.pc()); let cycles = jr(cpu, cpu.regs.f.c(), new); return cycles},
         0x39 => {let hl = add_u16(cpu.regs.get_hl(), cpu.regs.sp, &mut cpu.regs.f); cpu.regs.set_hl(hl); return 8},
-        0x3A => {cpu.regs.a = memory.read(cpu.regs.get_hld()); return 8},
+        0x3A => {cpu.regs.a = mem.read(cpu.regs.get_hld()); return 8},
         0x3B => {cpu.regs.sp = cpu.regs.sp.wrapping_sub(1); return 4},
         0x3C => {inc(&mut cpu.regs.a, &mut cpu.regs.f); return 4},
         0x3D => {dec(&mut cpu.regs.a, &mut cpu.regs.f); return 4},
-        0x3E => {cpu.regs.a = memory.read(cpu.regs.pc()); return 8},
+        0x3E => {cpu.regs.a = mem.read(cpu.regs.pc()); return 8},
         0x3F => {ccf(&mut cpu.regs.f); return 4},
-        0x76 => {cpu.halt = true; return 4},
+        0x76 => {
+            if cpu.ime {
+                cpu.halt = true;
+                return 4;
+            }
+            if mem.read(0xFF0F) & mem.read(0xFFFF) == 0 { 
+                cpu.halt = true; 
+            } 
+            return 4
+        },
         0x40..=0x7F => {
             let adjusted_opcode = opcode - 0x40;
             let src = adjusted_opcode % 8;
@@ -158,7 +168,7 @@ fn unprefixed_opcode(cpu: &mut Cpu, memory: &mut Memory, opcode: u8) -> u8 {
                 3 => cpu.regs.e,
                 4 => cpu.regs.h,
                 5 => cpu.regs.l,
-                6 => memory.read(cpu.regs.get_hl()),
+                6 => mem.read(cpu.regs.get_hl()),
                 7 => cpu.regs.a,
                 _ => unreachable!(),
             };
@@ -170,7 +180,7 @@ fn unprefixed_opcode(cpu: &mut Cpu, memory: &mut Memory, opcode: u8) -> u8 {
                 4 => &mut cpu.regs.h,
                 5 => &mut cpu.regs.l,
                 6 => {
-                    memory.write(cpu.regs.get_hl(), data);
+                    mem.write(cpu.regs.get_hl(), data);
                     return 8;
                 }
                 7 => &mut cpu.regs.a,
@@ -191,7 +201,7 @@ fn unprefixed_opcode(cpu: &mut Cpu, memory: &mut Memory, opcode: u8) -> u8 {
                 3 => cpu.regs.e,
                 4 => cpu.regs.h,
                 5 => cpu.regs.l,
-                6 => memory.read(cpu.regs.get_hl()),
+                6 => mem.read(cpu.regs.get_hl()),
                 7 => cpu.regs.a,
                 _ => unreachable!()
             };
@@ -209,67 +219,61 @@ fn unprefixed_opcode(cpu: &mut Cpu, memory: &mut Memory, opcode: u8) -> u8 {
             func(&mut cpu.regs.a, data, &mut cpu.regs.f);
             return if src == 6 { 8 } else { 4 };
         },
-        0xC0 => {let cycles = ret(cpu, !cpu.regs.f.z(), memory); return cycles},
-        0xC1 => {cpu.regs.set_bc(memory.read_word(cpu.regs.sp)); cpu.regs.sp += 2; return 12},
-        0xC2 => {let new = memory.read_word(cpu.regs.pc_word()); let cycles = jp(cpu, !cpu.regs.f.z(), new); return cycles},
-        0xC3 => {let new = memory.read_word(cpu.regs.pc_word()); let cycles = jp(cpu, true, new); return cycles},
-        0xC4 => {let cycles = call(cpu, !cpu.regs.f.z(), memory); return cycles},
-        0xC5 => {memory.write_word(cpu.regs.sp-2, cpu.regs.get_bc()); cpu.regs.sp -= 2; return 16},
-        0xC6 => {let data = memory.read(cpu.regs.pc()); add(&mut cpu.regs.a, data, &mut cpu.regs.f); return 8}
-        0xC7 => {rst(cpu, memory, 0x00); return 16},
-        0xC8 => {let cycles = ret(cpu, cpu.regs.f.z(), memory); return cycles},
-        0xC9 => {let cycles = ret(cpu, true, memory); cpu.ime = true; return cycles}
-        0xCA => {let pc = cpu.regs.pc_word(); let cycles = jp(cpu, cpu.regs.f.z(), memory.read_word(pc)); return cycles}
-        0xCC => {let cycles = call(cpu, cpu.regs.f.z(), memory); return cycles}
-        0xCD => {let cycles = call(cpu, true, memory); return cycles},
-        0xCE => {let data = cpu.regs.pc(); adc(&mut cpu.regs.a, memory.read(data), &mut cpu.regs.f); },
-        0xCF => {rst(cpu, memory, 0x08); },
-        0xD0 => {let cycles = ret(cpu, !cpu.regs.f.c(), memory); return cycles},
-        0xD1 => {cpu.regs.set_de(memory.read_word(cpu.regs.sp)); cpu.regs.sp += 2; return 12},
-        0xD2 => {let pc = cpu.regs.pc_word(); let cycles = jp(cpu, !cpu.regs.f.c(), memory.read_word(pc)); return cycles}
-        0xD4 => {let cycles = call(cpu, !cpu.regs.f.c(), memory); return cycles},
-        0xD5 => {memory.write_word(cpu.regs.sp-2, cpu.regs.get_de()); cpu.regs.sp -= 2; return 16}
-        0xD6 => {let data = memory.read(cpu.regs.pc()); sub(&mut cpu.regs.a, data, &mut cpu.regs.f); return 8}
-        0xD7 => {rst(cpu, memory, 0x10); return 16}
-        0xD8 => {let cycles = ret(cpu, cpu.regs.f.c(), memory); return cycles},
-        0xD9 => {let cycles = ret(cpu, true, memory); cpu.scheduled_ime=true; return cycles}
-        0xDA => {let pc = cpu.regs.pc_word(); let cycles = jp(cpu, cpu.regs.f.c(), memory.read_word(pc)); return cycles},
-        0xDC => {let cycles = call(cpu, cpu.regs.f.c(), memory); return cycles},
-        0xDE => {let data = memory.read(cpu.regs.pc()); sbc(&mut cpu.regs.a, data, &mut cpu.regs.f); return 8},
-        0xDF => {rst(cpu, memory, 0x18); return 16},
-        0xE0 => {let address = memory.read(cpu.regs.pc()) as u16 + 0xFF00; memory.write(address, cpu.regs.a); return 12}
-        0xE1 => {cpu.regs.set_hl(memory.read_word(cpu.regs.sp)); cpu.regs.sp += 2; return 12},
-        0xE2 => {let address = cpu.regs.c as u16 + 0xFF00; memory.write(address, cpu.regs.a); return 8},
-        0xE5 => {memory.write_word(cpu.regs.sp-2, cpu.regs.get_hl()); cpu.regs.sp -= 2; return 16},
-        0xE6 => {let data = memory.read(cpu.regs.pc()); and(&mut cpu.regs.a, data, &mut cpu.regs.f); return 8},
-        0xE7 => {rst(cpu, memory, 0x20); return 16},
-        0xE8 => {let data = memory.read(cpu.regs.pc()) as i8; add_u16_i8(&mut cpu.regs.sp, data, &mut cpu.regs.f); return 16},
+        0xC0 => {let cycles = ret(cpu, !cpu.regs.f.z(), mem); return cycles},
+        0xC1 => {cpu.regs.set_bc(mem.read_word(cpu.regs.sp)); cpu.regs.sp += 2; return 12},
+        0xC2 => {let new = mem.read_word(cpu.regs.pc_word()); let cycles = jp(cpu, !cpu.regs.f.z(), new); return cycles},
+        0xC3 => {let new = mem.read_word(cpu.regs.pc_word()); let cycles = jp(cpu, true, new); return cycles},
+        0xC4 => {let cycles = call(cpu, !cpu.regs.f.z(), mem); return cycles},
+        0xC5 => {mem.write_word(cpu.regs.sp-2, cpu.regs.get_bc()); cpu.regs.sp -= 2; return 16},
+        0xC6 => {let data = mem.read(cpu.regs.pc()); add(&mut cpu.regs.a, data, &mut cpu.regs.f); return 8}
+        0xC7 => {rst(cpu, mem, 0x00); return 16},
+        0xC8 => {let cycles = ret(cpu, cpu.regs.f.z(), mem); return cycles},
+        0xC9 => {let cycles = ret(cpu, true, mem); cpu.ime = true; return cycles}
+        0xCA => {let pc = cpu.regs.pc_word(); let cycles = jp(cpu, cpu.regs.f.z(), mem.read_word(pc)); return cycles}
+        0xCC => {let cycles = call(cpu, cpu.regs.f.z(), mem); return cycles}
+        0xCD => {let cycles = call(cpu, true, mem); return cycles},
+        0xCE => {let data = cpu.regs.pc(); adc(&mut cpu.regs.a, mem.read(data), &mut cpu.regs.f); return 8},
+        0xCF => {rst(cpu, mem, 0x08); return 16},
+        0xD0 => {let cycles = ret(cpu, !cpu.regs.f.c(), mem); return cycles},
+        0xD1 => {cpu.regs.set_de(mem.read_word(cpu.regs.sp)); cpu.regs.sp += 2; return 12},
+        0xD2 => {let pc = cpu.regs.pc_word(); let cycles = jp(cpu, !cpu.regs.f.c(), mem.read_word(pc)); return cycles}
+        0xD4 => {let cycles = call(cpu, !cpu.regs.f.c(), mem); return cycles},
+        0xD5 => {mem.write_word(cpu.regs.sp-2, cpu.regs.get_de()); cpu.regs.sp -= 2; return 16}
+        0xD6 => {let data = mem.read(cpu.regs.pc()); sub(&mut cpu.regs.a, data, &mut cpu.regs.f); return 8}
+        0xD7 => {rst(cpu, mem, 0x10); return 16}
+        0xD8 => {let cycles = ret(cpu, cpu.regs.f.c(), mem); return cycles},
+        0xD9 => {let cycles = ret(cpu, true, mem); cpu.scheduled_ime=true; return cycles}
+        0xDA => {let pc = cpu.regs.pc_word(); let cycles = jp(cpu, cpu.regs.f.c(), mem.read_word(pc)); return cycles},
+        0xDC => {let cycles = call(cpu, cpu.regs.f.c(), mem); return cycles},
+        0xDE => {let data = mem.read(cpu.regs.pc()); sbc(&mut cpu.regs.a, data, &mut cpu.regs.f); return 8},
+        0xDF => {rst(cpu, mem, 0x18); return 16},
+        0xE0 => {let address = mem.read(cpu.regs.pc()) as u16 + 0xFF00; mem.write(address, cpu.regs.a); return 12}
+        0xE1 => {cpu.regs.set_hl(mem.read_word(cpu.regs.sp)); cpu.regs.sp += 2; return 12},
+        0xE2 => {let address = cpu.regs.c as u16 + 0xFF00; mem.write(address, cpu.regs.a); return 8},
+        0xE5 => {mem.write_word(cpu.regs.sp-2, cpu.regs.get_hl()); cpu.regs.sp -= 2; return 16},
+        0xE6 => {let data = mem.read(cpu.regs.pc()); and(&mut cpu.regs.a, data, &mut cpu.regs.f); return 8},
+        0xE7 => {rst(cpu, mem, 0x20); return 16},
+        0xE8 => {let data = mem.read(cpu.regs.pc()) as i8; add_u16_i8(&mut cpu.regs.sp, data, &mut cpu.regs.f); return 16},
         0xE9 => {jp(cpu, true, cpu.regs.get_hl()); return 4},
-        0xEA => {let address = memory.read_word(cpu.regs.pc_word()); memory.write(address, cpu.regs.a); return 16}
-        0xEE => {let data = memory.read(cpu.regs.pc()); xor(&mut cpu.regs.a, data, &mut cpu.regs.f); return 8}
-        0xEF => {rst(cpu, memory, 0x28); return 16},
-        0xF0 => {let data_address = memory.read(cpu.regs.pc()) as u16 + 0xFF00; cpu.regs.a = memory.read(data_address); return 12},
-        0xF1 => {cpu.regs.set_af(memory.read_word(cpu.regs.sp)); cpu.regs.sp += 2; return 12},
-        0xF2 => {let data_address = cpu.regs.c as u16 + 0xFF00; cpu.regs.a = memory.read(data_address); return 8},
+        0xEA => {let address = mem.read_word(cpu.regs.pc_word()); mem.write(address, cpu.regs.a); return 16}
+        0xEE => {let data = mem.read(cpu.regs.pc()); xor(&mut cpu.regs.a, data, &mut cpu.regs.f); return 8}
+        0xEF => {rst(cpu, mem, 0x28); return 16},
+        0xF0 => {let data_address = mem.read(cpu.regs.pc()) as u16 + 0xFF00; cpu.regs.a = mem.read(data_address); return 12},
+        0xF1 => {cpu.regs.set_af(mem.read_word(cpu.regs.sp)); cpu.regs.sp += 2; return 12},
+        0xF2 => {let data_address = cpu.regs.c as u16 + 0xFF00; cpu.regs.a = mem.read(data_address); return 8},
         0xF3 => {cpu.scheduled_ime=false; return 4},
-        0xF5 => {memory.write_word(cpu.regs.sp-2, cpu.regs.get_af()); cpu.regs.sp -= 2; return 16},
-        0xF6 => {let data = memory.read(cpu.regs.pc()); or(&mut cpu.regs.a, data, &mut cpu.regs.f); return 8},
-        0xF7 => {rst(cpu, memory, 0x30); return 16},
-        0xF8 => {let data = memory.read(cpu.regs.pc()) as i8; set_add_u16_i8(cpu, data); return 12},
+        0xF5 => {mem.write_word(cpu.regs.sp-2, cpu.regs.get_af()); cpu.regs.sp -= 2; return 16},
+        0xF6 => {let data = mem.read(cpu.regs.pc()); or(&mut cpu.regs.a, data, &mut cpu.regs.f); return 8},
+        0xF7 => {rst(cpu, mem, 0x30); return 16},
+        0xF8 => {let data = mem.read(cpu.regs.pc()) as i8; set_add_u16_i8(cpu, data); return 12},
         0xF9 => {cpu.regs.sp = cpu.regs.get_hl(); return 8},
-        0xFA => {let address = memory.read_word(cpu.regs.pc_word()); cpu.regs.a = memory.read(address); return 16}
+        0xFA => {let address = mem.read_word(cpu.regs.pc_word()); cpu.regs.a = mem.read(address); return 16}
         0xFB => {cpu.scheduled_ime = true; return 4},
-        0xFE => {let data = memory.read(cpu.regs.pc()); cp(&mut cpu.regs.a, data, &mut cpu.regs.f); return 8},
-        0xFF => {rst(cpu, memory, 0x38); return 16}
+        0xFE => {let data = mem.read(cpu.regs.pc()); cp(&mut cpu.regs.a, data, &mut cpu.regs.f); return 8},
+        0xFF => {rst(cpu, mem, 0x38); return 16}
         _ => panic!("unsupported opcode"),
     }
-    return 0;
 }
-
-
-
-
-
 fn prefixed_opcode(cpu: &mut Cpu, memory: &mut Memory) -> u8 {
     fn run_operation(data: &mut u8, operation: u8, flag: &mut Flag) {
         match operation {
