@@ -1,5 +1,5 @@
 use rand::{distributions::Standard, Rng};
-use crate::util::little_endian_combine;
+use crate::{joypad, util::{little_endian_combine, JOYPAD_ADDRESS}};
 
 // just helps with boot rom not failing the check
 const NINTENDO_LOGO: [u8; 48] = 
@@ -64,9 +64,9 @@ impl Memory {
         }
 
         // only the upper bits of joypad register are writable
-        if address == 0xFF00 {
-            let new = (data & 0xF0) | (self.mem[0xFF00] & 0x0F);
-            self.mem[0xFF00] =  new;
+        if address == JOYPAD_ADDRESS {
+            self.mem[JOYPAD_ADDRESS] &=  0x0F;
+            self.mem[JOYPAD_ADDRESS] |= data & 0xF0;
             return;
         }
 
@@ -112,8 +112,8 @@ impl Memory {
     pub fn read(&self, address: u16) -> u8 {
         let address = address as usize;
 
-        if address == 0xFF00 {
-            return self.mem[address];
+        if address == JOYPAD_ADDRESS as usize {
+            return joypad(self.mem[JOYPAD_ADDRESS]);
         }
 
         // only the second bit of the stat register matter

@@ -7,27 +7,51 @@ mod timer;
 mod util;
 
 use core::panic;
-use std::{env, fs::File, io::Write};
+use std::env;
 use macroquad::prelude::*;
 
-use util::{JOYPAD_ADDRESS, INTERRUPT_FLAG_ADDRESS};
 use processor::{Cpu, handle_interrupts};
 use gpu::{Ppu, update_ppu};
 use memory::Memory;
 use processor::run;
 use timer::update_timer;
+use util::INTERRUPT_F_ADDRESS;
 
+pub fn joypad_interrupt(mem: &mut Memory) {
+    let mut interrupt = false;
+    interrupt |= is_key_pressed(KeyCode::A);
+    interrupt |= is_key_pressed(KeyCode::B);
+    interrupt |= is_key_pressed(KeyCode::Enter);
+    interrupt |= is_key_pressed(KeyCode::Space);
+    interrupt |= is_key_pressed(KeyCode::Left);
+    interrupt |= is_key_pressed(KeyCode::Right);
+    interrupt |= is_key_pressed(KeyCode::Up);
+    interrupt |= is_key_pressed(KeyCode::Down);
 
-fn joypad(mem: &mut Memory) {
-    let mut current_joypad = mem.read(JOYPAD_ADDRESS);
-    let old_joypad = current_joypad;
-    
-    let mut pressed = false;
+    if interrupt {
+        let interrupt = mem.read(INTERRUPT_F_ADDRESS);
+        mem.write(INTERRUPT_F_ADDRESS, interrupt|0b0001_0000);
+    }
+}
 
-    
-
-    mem.unchecked_write(JOYPAD_ADDRESS, current_joypad);
-    todo!();
+pub fn joypad(joypad: u8) -> u8 {
+    let mut upper_joypad = joypad & 0b1111_0000;
+    // neither buttons nor d-pad is selected
+    if upper_joypad & 0x30 == 0x30 {
+        return upper_joypad | 0xF;
+    }
+    if upper_joypad & 0b0001_00000 == 0 {
+        upper_joypad |= (!is_key_down(KeyCode::A) as u8) << 0;
+        upper_joypad |= (!is_key_down(KeyCode::S) as u8) << 1;
+        upper_joypad |= (!is_key_down(KeyCode::Space) as u8) << 2;
+        upper_joypad |= (!is_key_down(KeyCode::Enter) as u8) << 3;
+        return upper_joypad;
+    }
+    upper_joypad |= (!is_key_down(KeyCode::Right) as u8) << 0;
+    upper_joypad |= (!is_key_down(KeyCode::Left) as u8) << 1;
+    upper_joypad |= (!is_key_down(KeyCode::Up) as u8) << 2;
+    upper_joypad |= (!is_key_down(KeyCode::Down) as u8) << 3;
+    return upper_joypad;
 }
 
 fn serial_output(mem: &mut Memory) {
@@ -44,7 +68,6 @@ fn to_screen_pixel(p: u8) -> Color {
         1 => return LIGHTGRAY,
         2 => return DARKGRAY,
         3 => return BLACK,
-        // error color
         4 => return BLANK,
         _ => unreachable!()
     }
@@ -55,11 +78,6 @@ fn get_rom(rom_path: &String) -> Vec<u8> {
         Err(_) => panic!("invalid file provided"),
         Ok(f) => f,
     }
-}
-
-fn dump_memory(mem: &Memory) {
-    let mut debug_file = File::create("debug.gb").unwrap();
-    debug_file.write_all(&mem.mem).unwrap();
 }
 
 const SCALE_FACTOR: i32 = 3;
@@ -78,16 +96,14 @@ async fn main() {
     let args: Vec<String> = env::args().collect();
     
     let rom_path;
-    let booted;
+    let mut booted = true;
 
-    if args.len() == 2 {
-        rom_path = &args[1];
-        booted = true;
-    } else if args.len() == 3 {
-        rom_path = &args[1];
-        booted = !(args[2] == "unbooted");
-    } else {
-        panic!("invalid number of arguments provided");
+    if args.len() == 1 {
+        panic!("invalid number of arguments");
+    }
+    rom_path = &args[1];
+    if args.len() == 3 && args[2] == "--unbooted" {
+        booted = false;
     }
 
     let mut cpu = Cpu::new(booted);
@@ -101,23 +117,26 @@ async fn main() {
             if cpu.regs.pc == 0x100 && !booted {
                 break 'full;
             }
-
+            
+            // handles all of the interrupts
+            joypad_interrupt(&mut memory);
             handle_interrupts(&mut cpu, &mut memory);
+
+
+            // halt still increments the cycles and timer
+            // runs the instruction otherwise
             let mut cycles = 4;
             if !cpu.halt {
                 cycles = run(&mut cpu, &mut memory);
             }
-
             update_timer(&mut memory, cycles);
-            joypad(&mut memory);
-
-            // just useful for any outputs some roms may have
             serial_output(&mut memory);
 
             if let Some(line) = update_ppu(&mut ppu, &mut memory, cycles) {
                 pixel_buffer.extend::<Vec<u8>>(line);
             }
         }
+
         // all of the actual rendering to the screen
         clear_background(BLACK);
         for (j, pixel) in pixel_buffer.iter().enumerate() {
@@ -135,7 +154,6 @@ async fn main() {
 
         // debug section of the emulator
         if !booted && cpu.regs.pc == 0xE9 {
-            dump_memory(&memory);
             break 'full;
         }
     }

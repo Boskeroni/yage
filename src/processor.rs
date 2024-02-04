@@ -2,6 +2,8 @@ use crate::memory::Memory;
 use crate::registers::*;
 
 use crate::opcodes::*;
+use crate::util::INTERRUPT_E_ADDRESS;
+use crate::util::INTERRUPT_F_ADDRESS;
 
 #[derive(Default, Debug)]
 pub struct Cpu {
@@ -30,7 +32,7 @@ impl Cpu {
 /// check if the interrupt handler is memory  or not
 /// could be automatically done without needing timer updates
 pub fn handle_interrupts(cpu: &mut Cpu, memory: &mut Memory) {
-    let possible_interrupts = memory.read(0xFFFF) & memory.read(0xFF0F);
+    let possible_interrupts = memory.read(INTERRUPT_E_ADDRESS) & memory.read(INTERRUPT_F_ADDRESS);
 
     if cpu.halt && possible_interrupts != 0 {
         cpu.halt = false;
@@ -57,8 +59,8 @@ pub fn handle_interrupts(cpu: &mut Cpu, memory: &mut Memory) {
     cpu.scheduled_ime = false;
 
     // unset this interrupt bit
-    let new_interrupt = memory.read(0xFF0F) & !(1<<priority);
-    memory.write(0xFF0F, new_interrupt);
+    let new_interrupt = memory.read(INTERRUPT_F_ADDRESS) & !(1<<priority);
+    memory.write(INTERRUPT_F_ADDRESS, new_interrupt);
 }
 
 /// this handles all the opcodes for the gameboy. It returns the number of T-cycles which were used to 
@@ -98,7 +100,7 @@ fn unprefixed_opcode(cpu: &mut Cpu, mem: &mut Memory, opcode: u8) -> u8 {
         0x0D => {dec(&mut cpu.regs.c, &mut cpu.regs.f); return 4},
         0x0E => {cpu.regs.c = mem.read(cpu.regs.pc()); return 8},
         0x0F => {rrc(&mut cpu.regs.a, &mut cpu.regs.f); cpu.regs.f.set_z(false); return 4}
-        0x10 => {cpu.stopped = true; cpu.regs.pc(); mem.write(0xFF05, 0); return 4} 
+        0x10 => {cpu.stopped = true; cpu.regs.pc(); mem.write(0xFF04, 0); return 4} 
         0x11 => {let pc = cpu.regs.pc_word(); cpu.regs.set_de(mem.read_word(pc)); return 12},
         0x12 => {mem.write(cpu.regs.get_de(), cpu.regs.a); return 8},
         0x13 => {cpu.regs.set_de(cpu.regs.get_de().wrapping_add(1)); return 8},
@@ -151,7 +153,7 @@ fn unprefixed_opcode(cpu: &mut Cpu, mem: &mut Memory, opcode: u8) -> u8 {
                 cpu.halt = true;
                 return 4;
             }
-            if mem.read(0xFF0F) & mem.read(0xFFFF) == 0 { 
+            if mem.read(INTERRUPT_E_ADDRESS) & mem.read(INTERRUPT_F_ADDRESS) == 0 { 
                 cpu.halt = true; 
             } 
             return 4
