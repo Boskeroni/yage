@@ -44,4 +44,6 @@ pub fn update_timer(memory: &mut Memory, cycles: u8) {
             memory.write(TIMA as u16, new_tima);
         }
     }
+    // update the register as well
+    memory.div = memory.div.wrapping_add(cycles);
 }

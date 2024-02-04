@@ -94,14 +94,12 @@ fn window_conf() -> Conf {
 #[macroquad::main(window_conf)]
 async fn main() {
     let args: Vec<String> = env::args().collect();
-    
-    let rom_path;
     let mut booted = true;
 
     if args.len() == 1 {
         panic!("invalid number of arguments");
     }
-    rom_path = &args[1];
+    let rom_path = &args[1];
     if args.len() == 3 && args[2] == "--unbooted" {
         booted = false;
     }
@@ -136,7 +134,6 @@ async fn main() {
                 pixel_buffer.extend::<Vec<u8>>(line);
             }
         }
-
         // all of the actual rendering to the screen
         clear_background(BLACK);
         for (j, pixel) in pixel_buffer.iter().enumerate() {
