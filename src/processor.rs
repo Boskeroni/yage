@@ -294,14 +294,11 @@ fn prefixed_opcode(cpu: &mut Cpu, memory: &mut Memory) -> u8 {
 
     // the new opcode pretty much
     let opcode = memory.read(cpu.regs.pc());
-
     // the register which the operation is going to be performed on
     // selected through match statement
     let target = opcode % 8;
-
     // the operation which will be performed. again used in match statement.
     let operation = opcode / 8;
-
     // meaning we are changing the [hl]
     if target == 6 {
         let hl = cpu.regs.get_hl();
