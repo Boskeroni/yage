@@ -5,8 +5,9 @@ mod opcodes;
 mod gpu;
 mod timer;
 mod util;
+mod args;
 
-use std::env;
+use clap::Parser;
 use macroquad::prelude::*;
 
 use processor::{Cpu, handle_interrupts};
@@ -92,19 +93,10 @@ fn window_conf() -> Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    let args: Vec<String> = env::args().collect();
-    let mut booted = true;
+    let args = args::Args::parse();
 
-    if args.len() == 1 {
-        panic!("invalid number of arguments");
-    }
-    let rom_path = &args[1];
-    if args.len() == 3 && args[2] == "--unbooted" {
-        booted = false;
-    }
-
-    let mut cpu = Cpu::new(booted);
-    let mut memory = Memory::new(get_rom(rom_path), booted);
+    let mut cpu = Cpu::new(args.booted);
+    let mut memory = Memory::new(get_rom(&args.rom_name), args.booted);
     let mut ppu = Ppu::default();
 
     let mut pixel_buffer: Vec<u8> = Vec::new();
@@ -112,7 +104,7 @@ async fn main() {
         joypad_interrupt(&mut memory);
 
         while pixel_buffer.len() != 23040 {
-            if cpu.regs.pc == 0x100 && !booted {
+            if cpu.regs.pc == 0x100 && !args.booted {
                 break 'full;
             }
             
@@ -148,7 +140,7 @@ async fn main() {
         pixel_buffer.clear();
 
         // debug section of the emulator
-        if !booted && cpu.regs.pc == 0xE9 {
+        if !args.booted && cpu.regs.pc == 0xE9 {
             break 'full;
         }
     }
