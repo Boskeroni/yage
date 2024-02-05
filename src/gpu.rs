@@ -62,6 +62,7 @@ pub fn update_ppu(ppu: &mut Ppu, mem: &mut Memory, ticks: u8) -> Option<Vec<u8>>
         let lyc = mem.read(PpuRegisters::LYC as u16);
         let ly = mem.read(PpuRegisters::LY as u16);
         if lyc == ly {
+            println!("lyc == ly condition met");
             let stat = mem.read(PpuRegisters::STAT as u16);
             mem.write(PpuRegisters::STAT as u16, stat|0b0000_0100);
         }
@@ -197,7 +198,7 @@ fn draw_sprites(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
     }
     oam_buffer.sort_by(|a, b| a[1].cmp(&b[1]));
 
-    let mut sprite_pixels = vec![BLANK_PIXEL; 256]; // 160 (length of lcd + 8x2 pad)
+    let mut sprite_pixels = vec![BLANK_PIXEL; 300]; // 160 (length of lcd + 8x2 pad)
     for sprite in oam_buffer {
         let mut tile_data = mem.read_tile(0x8000 + (sprite[2] as u16*16));
         if sprite[3] & 0b0100_0000 != 0 {

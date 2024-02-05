@@ -6,7 +6,6 @@ mod gpu;
 mod timer;
 mod util;
 
-use core::panic;
 use std::env;
 use macroquad::prelude::*;
 
@@ -80,7 +79,7 @@ fn get_rom(rom_path: &String) -> Vec<u8> {
     }
 }
 
-const SCALE_FACTOR: i32 = 3;
+const SCALE_FACTOR: i32 = 5;
 fn window_conf() -> Conf {
     Conf {
         window_title: "gameboy emulator".to_owned(),
@@ -109,19 +108,16 @@ async fn main() {
     let mut ppu = Ppu::default();
 
     let mut pixel_buffer: Vec<u8> = Vec::new();
-    
     'full: loop {
-
         joypad_interrupt(&mut memory);
 
-        while pixel_buffer.len() != 23040*4 {
+        while pixel_buffer.len() != 23040 {
             if cpu.regs.pc == 0x100 && !booted {
                 break 'full;
             }
             
             // handles all of the interrupts
             handle_interrupts(&mut cpu, &mut memory);
-
 
             // halt still increments the cycles and timer
             // runs the instruction otherwise
@@ -136,8 +132,7 @@ async fn main() {
             if let Some(line) = update_ppu(&mut ppu, &mut memory, cycles) {
                 pixel_buffer.extend::<Vec<u8>>(line);
             }
-        }
- 
+        }  
         // all of the actual rendering to the screen
         for (j, pixel) in pixel_buffer.iter().enumerate() {
             let pixel = to_screen_pixel(*pixel);
@@ -149,8 +144,8 @@ async fn main() {
                 pixel // color
             );
         }
-        pixel_buffer.clear();
         next_frame().await;
+        pixel_buffer.clear();
 
         // debug section of the emulator
         if !booted && cpu.regs.pc == 0xE9 {

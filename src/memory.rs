@@ -1,5 +1,6 @@
 use rand::{distributions::Standard, Rng};
-use crate::{joypad, util::{little_endian_combine, JOYPAD_ADDRESS}};
+use crate::joypad;
+use crate::util::{little_endian_combine, JOYPAD_ADDRESS};
 
 // just helps with boot rom not failing the check
 const NINTENDO_LOGO: [u8; 48] = 
@@ -20,9 +21,6 @@ pub struct Memory {
 impl Memory {
     pub fn new_unbooted(rom: Vec<u8>) -> Self {
         let mut memory = rom;
-        if memory.len() > 0x8000 {
-            panic!("not going to handle these yet")
-        }
         let padding_amount = 0xFE00 - memory.len();
         let padding_vec = random_padding(padding_amount);
         memory.extend(padding_vec);
@@ -142,16 +140,12 @@ impl Memory {
         // the address is the tile in the background
         // not the data for the tile
         let tile_index = self.mem[address as usize];
-        let tile_address;
 
-        if addressing == 0x8000 {
-            tile_address = addressing + (tile_index as u16) * 16;
-        } else if addressing == 0x8800 {
-            tile_address = addressing.checked_add_signed(tile_index as i8 as i16).unwrap();
-        } else {
-            panic!("invalid addressing for tiles");
-        }
-
+        let tile_address = match addressing {
+            0x8000 => addressing + (tile_index as u16) * 16,
+            0x8800 => 0x9000_u16.wrapping_add_signed((tile_index as i8 as i16) * 16),
+            _ => panic!("invalid addressing"),
+        };
         self.read_tile(tile_address)
     }
 
