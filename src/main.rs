@@ -7,7 +7,7 @@ mod timer;
 mod util;
 
 use core::panic;
-use std::env;
+use std::{env, time::Instant};
 use macroquad::prelude::*;
 
 use processor::{Cpu, handle_interrupts};
@@ -110,16 +110,22 @@ async fn main() {
 
     let mut pixel_buffer: Vec<u8> = Vec::new();
 
+    let mut total_time = 0;
+    let mut total_runs = 0;
+
     'full: loop {
+        joypad_interrupt(&mut memory);
+
         while pixel_buffer.len() != 23040 {
             if cpu.regs.pc == 0x100 && !booted {
                 break 'full;
             }
             
+
             // handles all of the interrupts
-            joypad_interrupt(&mut memory);
             handle_interrupts(&mut cpu, &mut memory);
 
+            let start = Instant::now();
 
             // halt still increments the cycles and timer
             // runs the instruction otherwise
@@ -127,6 +133,14 @@ async fn main() {
             if !cpu.halt {
                 cycles = run(&mut cpu, &mut memory);
             }
+
+            let diff = Instant::now().duration_since(start);
+
+            total_time += diff.as_nanos();
+            total_runs += 1;
+
+            println!("average time for interrupts => {}ns", total_time/total_runs);
+
             update_timer(&mut memory, cycles);
             serial_output(&mut memory);
 

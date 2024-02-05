@@ -5,6 +5,8 @@ use crate::opcodes::*;
 use crate::util::INTERRUPT_E_ADDRESS;
 use crate::util::INTERRUPT_F_ADDRESS;
 
+const VEC_ADDRESSES: [u16; 5] = [0x40, 0x48, 0x50, 0x58, 0x60];
+
 #[derive(Default, Debug)]
 pub struct Cpu {
     pub regs: Registers,
@@ -32,26 +34,22 @@ impl Cpu {
 /// check if the interrupt handler is memory  or not
 /// could be automatically done without needing timer updates
 pub fn handle_interrupts(cpu: &mut Cpu, memory: &mut Memory) {
-    let possible_interrupts = memory.read(INTERRUPT_E_ADDRESS) & memory.read(INTERRUPT_F_ADDRESS);
+    let interrupts_called = memory.read(INTERRUPT_F_ADDRESS);
+    let interrupts_allowed = memory.read(INTERRUPT_E_ADDRESS);
+    let possible_interrupts = interrupts_called & interrupts_allowed;
 
+    if !cpu.ime || possible_interrupts == 0 {
+        return
+    }
     if cpu.halt && possible_interrupts != 0 {
         cpu.halt = false;
         return;
     }
-    if !cpu.ime || possible_interrupts == 0 {
-        return
-    }
 
     // interrupts are handled right to left
     let priority = possible_interrupts.trailing_zeros();
-    let address = match priority {
-        0 => 0x40,
-        1 => 0x48,
-        2 => 0x50,
-        3 => 0x58,
-        4 => 0x60,
-        _ => panic!("invalid interrupt request made"),
-    };
+    let address = VEC_ADDRESSES[priority as usize];
+
     rst(cpu, memory, address);
 
     // reset the ime, schedule, and unset the interrupt
@@ -59,7 +57,7 @@ pub fn handle_interrupts(cpu: &mut Cpu, memory: &mut Memory) {
     cpu.scheduled_ime = false;
 
     // unset this interrupt bit
-    let new_interrupt = memory.read(INTERRUPT_F_ADDRESS) & !(1<<priority);
+    let new_interrupt = interrupts_called & !(1<<priority);
     memory.write(INTERRUPT_F_ADDRESS, new_interrupt);
 }
 
