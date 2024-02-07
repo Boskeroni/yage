@@ -265,7 +265,7 @@ fn draw_window(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
                 break 'window;
             }
         }
-        tile_number += 1;
+        tile_number -= 1;
     }
     return window_pixels[7..].to_vec();
 }
