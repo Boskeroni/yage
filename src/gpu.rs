@@ -277,47 +277,36 @@ fn draw_background(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
 
     let mut background_pixels = Vec::new();
 
+    // the address and addressing of the map and subsequent tiles
     let map_address = if lcdc & 0b0000_1000 != 0 { 0x9C00 } else { 0x9800 };
     let addressing: u16 = if lcdc & 0b0001_0000 != 0 { 0x8000 } else { 0x8800 };
 
+    // this is the line of the background which we are drawing
     let background_line = ly.wrapping_add(mem.read(PpuRegisters::SCY as u16));
+
     // which row of tile indexes in the background are used
     let bg_tile_row = background_line as u16 / 8;
-    // which row of each tile is being used
-    let tile_row = (background_line % 8) as usize;
+    let tile_row = background_line as usize % 8;
 
     let scx = mem.read(PpuRegisters::SCX as u16) as u16;
-
-    // this tile may not be fully displayed and so i will deal with it seperately
-    {
-        let tile_index = map_address + (bg_tile_row * 32) + (scx / 8);
-
-        let tile = mem.read_bg_tile(tile_index, addressing);
-        let tile_row = tile[tile_row]; 
-        let pixels_shown = 8-(scx%8);
-    
-        for i in (0..pixels_shown).rev() {
-            background_pixels.push((tile_row >> (i*2) & 0b0000_0011) as u8);
-        }
-    }
 
     // the rest of the tiles
     let mut tile_number = 0;
     'background: loop {
         // get the next tile
-        tile_number += 1;
         let tile_index = map_address + (bg_tile_row * 32) + (scx/8 + tile_number) % 32;
         let tile = mem.read_bg_tile(tile_index, addressing);
-        let tile_row_data = tile[background_line as usize % 8];
+        let tile_row_data = tile[tile_row];
         let pixels = get_individual_pixels(tile_row_data);
         for pixel in pixels {
             background_pixels.push(pixel);
-            if background_pixels.len() == 160 {
+            if background_pixels.len() == 168 {
                 break 'background
             }
         }
+        tile_number += 1;
     }
-    return background_pixels;
+    return background_pixels[(scx as usize)..].to_vec();
 }
 
 fn get_individual_pixels(tile_row: u16) -> Vec<u8> {
