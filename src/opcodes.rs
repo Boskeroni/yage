@@ -3,7 +3,7 @@
 
 use crate::Cpu;
 use crate::Memory;
-use crate::registers::Flag;
+use crate::cpu::Flag;
 
 //https://robdor.com/2016/08/10/gameboy-emulator-half-carry-flag/ goddamn is that smart
 fn half_carry_add(a: u8, b: u8) -> bool {

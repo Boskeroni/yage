@@ -1,5 +1,5 @@
 mod processor;
-mod registers;
+mod cpu;
 mod memory;
 mod opcodes;
 mod gpu;
@@ -10,17 +10,17 @@ mod args;
 use clap::Parser;
 use macroquad::prelude::*;
 
-use processor::{Cpu, handle_interrupts};
+use cpu::Cpu;
 use gpu::{Ppu, update_ppu};
 use memory::Memory;
-use processor::run;
+use processor::{run, handle_interrupts};
 use timer::update_timer;
 use util::INTERRUPT_F_ADDRESS;
 
 pub fn joypad_interrupt(mem: &mut Memory) {
     let mut interrupt = false;
     interrupt |= is_key_pressed(KeyCode::A);
-    interrupt |= is_key_pressed(KeyCode::B);
+    interrupt |= is_key_pressed(KeyCode::D);
     interrupt |= is_key_pressed(KeyCode::Enter);
     interrupt |= is_key_pressed(KeyCode::Space);
     interrupt |= is_key_pressed(KeyCode::Left);
@@ -42,7 +42,7 @@ pub fn joypad(joypad: u8) -> u8 {
     }
     if upper_joypad & 0b0001_00000 == 0 {
         upper_joypad |= (!is_key_down(KeyCode::A) as u8) << 0;
-        upper_joypad |= (!is_key_down(KeyCode::S) as u8) << 1;
+        upper_joypad |= (!is_key_down(KeyCode::D) as u8) << 1;
         upper_joypad |= (!is_key_down(KeyCode::Space) as u8) << 2;
         upper_joypad |= (!is_key_down(KeyCode::Enter) as u8) << 3;
         return upper_joypad;
@@ -75,7 +75,7 @@ fn to_screen_pixel(p: u8) -> Color {
 
 fn get_rom(rom_path: &String) -> Vec<u8> {
     match std::fs::read(rom_path) {
-        Err(_) => panic!("invalid file provided"),
+        Err(e) => panic!("invalid file provided => {e:?}"),
         Ok(f) => f,
     }
 }
@@ -94,9 +94,11 @@ fn window_conf() -> Conf {
 #[macroquad::main(window_conf)]
 async fn main() {
     let args = args::Args::parse();
+    let rom = get_rom(&args.rom_name);
 
     let mut cpu = Cpu::new(args.booted);
-    let mut memory = Memory::new(get_rom(&args.rom_name), args.booted);
+    let mut memory = Memory::new(rom, args.booted);
+
     let mut ppu = Ppu::default();
 
     let mut pixel_buffer: Vec<u8> = Vec::new();
@@ -107,7 +109,6 @@ async fn main() {
             if cpu.regs.pc == 0x100 && !args.booted {
                 break 'full;
             }
-            
             // handles all of the interrupts
             handle_interrupts(&mut cpu, &mut memory);
 
@@ -124,7 +125,7 @@ async fn main() {
             if let Some(line) = update_ppu(&mut ppu, &mut memory, cycles) {
                 pixel_buffer.extend::<Vec<u8>>(line);
             }
-        }  
+        } 
         // all of the actual rendering to the screen
         for (j, pixel) in pixel_buffer.iter().enumerate() {
             let pixel = to_screen_pixel(*pixel);

@@ -168,7 +168,7 @@ fn draw(ppu: &mut Ppu, mem: &mut Memory) -> Vec<u8> {
             continue;
         }
         let palette_id = sprite_pixel&0b0001_0000==0;
-        let palette = if palette_id { sprite_palette_0 } else { sprite_palette_1} ;
+        let palette = if palette_id { sprite_palette_0 } else { sprite_palette_1 };
         screen_pixels.push(to_palette(sprite_pixel&3, palette));
     }
     return screen_pixels;
@@ -265,7 +265,7 @@ fn draw_window(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
                 break 'window;
             }
         }
-        tile_number -= 1;
+        tile_number += 1;
     }
     return window_pixels[7..].to_vec();
 }
@@ -274,7 +274,6 @@ fn draw_background(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
     if lcdc & 0b0000_0001 == 0 {
         return vec![BLANK_PIXEL; 160];
     }
-
     let mut background_pixels = Vec::new();
 
     // the address and addressing of the map and subsequent tiles
@@ -290,11 +289,11 @@ fn draw_background(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
 
     let scx = mem.read(PpuRegisters::SCX as u16) as u16;
 
-    // the rest of the tiles
+    // drawing all of the tiles
     let mut tile_number = 0;
     'background: loop {
         // get the next tile
-        let tile_index = map_address + (bg_tile_row * 32) + (scx/8 + tile_number) % 32;
+        let tile_index = map_address + (bg_tile_row * 32) + ((scx/8 + tile_number) % 32);
         let tile = mem.read_bg_tile(tile_index, addressing);
         let tile_row_data = tile[tile_row];
         let pixels = get_individual_pixels(tile_row_data);
@@ -312,7 +311,7 @@ fn draw_background(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
 fn get_individual_pixels(tile_row: u16) -> Vec<u8> {
     let mut pixels = Vec::new();
     for i in (0..8).rev() {
-        pixels.push((tile_row >> (i*2) & 0b0000_0011) as u8);
+        pixels.push((tile_row >> (i*2) & 3) as u8);
     }
     return pixels
 }

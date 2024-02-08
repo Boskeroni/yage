@@ -1,35 +1,11 @@
 use crate::memory::Memory;
-use crate::registers::*;
+use crate::cpu::*;
 
 use crate::opcodes::*;
 use crate::util::INTERRUPT_E_ADDRESS;
 use crate::util::INTERRUPT_F_ADDRESS;
 
 const VEC_ADDRESSES: [u16; 5] = [0x40, 0x48, 0x50, 0x58, 0x60];
-
-#[derive(Default, Debug)]
-pub struct Cpu {
-    pub regs: Registers,
-    ime: bool,
-    scheduled_ime: bool,
-    stopped: bool,
-    pub halt: bool,
-}
-impl Cpu {
-    pub fn new(booted: bool) -> Self {
-        let regs;
-        if booted {
-            regs = Registers::default();
-        } else {
-            regs = Registers::new();
-        }
-
-        Self {
-            regs,
-            ..Default::default()
-        }
-    }
-}
 
 /// check if the interrupt handler is memory  or not
 /// could be automatically done without needing timer updates

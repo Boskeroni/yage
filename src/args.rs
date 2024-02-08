@@ -7,6 +7,6 @@ pub struct Args {
 
     #[arg(short, long)]
     pub booted: bool,
-
-    
+    #[arg(short, long)]
+    pub save: bool,  
 }
