@@ -57,14 +57,20 @@ impl Default for Ppu {
 /// updates the ppu, called in between instructions
 pub fn update_ppu(ppu: &mut Ppu, mem: &mut Memory, ticks: u8) -> Option<Vec<u8>> {
     use PpuState::*;
+
     // lyc == ly check should be done right at the start
-    if ppu.ticks == 0 && (mem.read(PpuRegisters::STAT as u16) & 0b0100_0000) != 0 {
-        let lyc = mem.read(PpuRegisters::LYC as u16);
-        let ly = mem.read(PpuRegisters::LY as u16);
-        if lyc == ly {
-            let stat = mem.read(PpuRegisters::STAT as u16);
-            mem.write(PpuRegisters::STAT as u16, stat|0b0000_0100);
+    if ppu.ticks == 0 {
+        let mut stat = mem.read(PpuRegisters::STAT as u16);
+        let condition_met = mem.read(PpuRegisters::LY as u16) == mem.read(PpuRegisters::LYC as u16);
+
+        stat &= 0b1111_1011;
+        stat |= (condition_met as u8) << 2;
+
+        if stat & 0b0100_0000 != 0 && condition_met {
+            let interrupt_flag = mem.read(INTERRUPT_F_ADDRESS);
+            mem.write(INTERRUPT_F_ADDRESS, interrupt_flag|0b0000_0010);
         }
+        mem.write(PpuRegisters::STAT as u16, stat);
     }
 
     ppu.ticks += ticks as usize;
@@ -90,15 +96,14 @@ pub fn update_ppu(ppu: &mut Ppu, mem: &mut Memory, ticks: u8) -> Option<Vec<u8>>
             }
             let ly = mem.read(PpuRegisters::LY as u16);
             mem.write(PpuRegisters::LY as u16, ly+1);
-            ppu.ticks = 0;
-    
+            *ppu = Ppu::default();
+            
             if ly == 143 {
                 stat_interrupt(mem, STAT_VBLANK, 1);
                 ppu.state = PpuState::VBlank;
                 return None;
             } 
             stat_interrupt(mem, STAT_OAM, 2);
-            ppu.state = PpuState::Oam
         }, // waits
         VBlank => {    
             if ppu.ticks < HBLANK_CYCLES*10 {
@@ -192,10 +197,12 @@ fn draw_sprites(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
         else if ly >= oam_sprite[0] + 8 { continue; } // ly+16 must be less than sprite y-position + sprite height
 
         oam_buffer.push(oam_sprite);
-        if oam_buffer.len() == 10 { 
+        if oam_buffer.len() == 10 {
+            println!("ten items found");
             break; // only the first ten items are wanted
         }
     }
+    // sorting by their x-positions so that conflicts are removed
     oam_buffer.sort_by(|a, b| a[1].cmp(&b[1]));
 
     let mut sprite_pixels = vec![BLANK_PIXEL; 300]; // 160 (length of lcd + 8x2 pad)
@@ -233,13 +240,13 @@ fn draw_window(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
     }
 
     let wy = mem.read(PpuRegisters::WY as u16);
+    let wx = mem.read(PpuRegisters::WX as u16);
 
     // the window will display just not on this line yet
-    if wy > ly {
+    if wy > ly || wx > 167 {
         return vec![BLANK_PIXEL; 160];
     }
 
-    let wx = mem.read(PpuRegisters::WX as u16);
     let map_address = if lcdc & 0b0100_0000 != 0 { 0x9C00 } else { 0x9800 };
     let addressing = if lcdc & 0b0001_0000 != 0 { 0x8000 } else { 0x8800 };
 
@@ -305,7 +312,7 @@ fn draw_background(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
         }
         tile_number += 1;
     }
-    return background_pixels[(scx as usize)..].to_vec();
+    return background_pixels[((scx%8) as usize)..].to_vec();
 }
 
 fn get_individual_pixels(tile_row: u16) -> Vec<u8> {

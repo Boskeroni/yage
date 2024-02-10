@@ -68,7 +68,7 @@ fn to_screen_pixel(p: u8) -> Color {
         1 => return LIGHTGRAY,
         2 => return DARKGRAY,
         3 => return BLACK,
-        4 => return BLANK,
+        4 => return WHITE,
         _ => unreachable!()
     }
 }
