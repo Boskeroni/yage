@@ -11,16 +11,16 @@ fn stat_interrupt(mem: &mut Memory, interrupt_index: u8, mode: u8) {
     let mut stat = mem.read(PpuRegisters::STAT as u16);
     stat &= 0b1111_1100;
     stat |= mode;
+    mem.write(PpuRegisters::STAT as u16, stat);
 
-    if mode == 3 {
+    // just means i dont want anything else happening
+    if interrupt_index == 0 || mode == 3 {
         return;
     }
-
     if stat & (1<<interrupt_index) != 0 {
         let interrupt_flag = mem.read(INTERRUPT_F_ADDRESS as u16);
         mem.write(INTERRUPT_F_ADDRESS as u16, interrupt_flag|0b0000_0010);
     }
-
     if mode == 1 {
         let i_flag = mem.read(INTERRUPT_F_ADDRESS as u16);
         mem.write(INTERRUPT_F_ADDRESS as u16, i_flag|1);
@@ -62,7 +62,6 @@ pub fn update_ppu(ppu: &mut Ppu, mem: &mut Memory, ticks: u8) -> Option<Vec<u8>>
         let lyc = mem.read(PpuRegisters::LYC as u16);
         let ly = mem.read(PpuRegisters::LY as u16);
         if lyc == ly {
-            println!("lyc == ly condition met");
             let stat = mem.read(PpuRegisters::STAT as u16);
             mem.write(PpuRegisters::STAT as u16, stat|0b0000_0100);
         }
@@ -120,6 +119,7 @@ fn draw(ppu: &mut Ppu, mem: &mut Memory) -> Vec<u8> {
     let ly = mem.read(PpuRegisters::LY as u16);
     // the screen is just off
     if lcdc & 0b1000_0000 == 0 {
+        stat_interrupt(mem, 0, 0);
         ppu.state = PpuState::HBlank;
         return vec![BLANK_PIXEL; 160];
     }

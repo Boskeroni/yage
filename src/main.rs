@@ -80,7 +80,7 @@ fn get_rom(rom_path: &String) -> Vec<u8> {
     }
 }
 
-const SCALE_FACTOR: i32 = 5;
+const SCALE_FACTOR: i32 = 2;
 fn window_conf() -> Conf {
     Conf {
         window_title: "gameboy emulator".to_owned(),
@@ -106,17 +106,15 @@ async fn main() {
         joypad_interrupt(&mut memory);
 
         while pixel_buffer.len() != 23040 {
+            // fail-safe for the boot rom
             if cpu.regs.pc == 0x100 && !args.booted {
                 break 'full;
             }
-            // handles all of the interrupts
-            handle_interrupts(&mut cpu, &mut memory);
 
-            // halt still increments the cycles and timer
-            // runs the instruction otherwise
             let mut cycles = 4;
+            cycles += handle_interrupts(&mut cpu, &mut memory);
             if !cpu.halt {
-                cycles = run(&mut cpu, &mut memory);
+                cycles += run(&mut cpu, &mut memory) - 4;
             }
 
             update_timer(&mut memory, cycles);

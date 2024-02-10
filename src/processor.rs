@@ -9,18 +9,19 @@ const VEC_ADDRESSES: [u16; 5] = [0x40, 0x48, 0x50, 0x58, 0x60];
 
 /// check if the interrupt handler is memory  or not
 /// could be automatically done without needing timer updates
-pub fn handle_interrupts(cpu: &mut Cpu, memory: &mut Memory) {
+pub fn handle_interrupts(cpu: &mut Cpu, memory: &mut Memory) -> u8 {
     let interrupts_called = memory.read(INTERRUPT_F_ADDRESS);
     let interrupts_allowed = memory.read(INTERRUPT_E_ADDRESS);
     let possible_interrupts = interrupts_called & interrupts_allowed;
 
-    if !cpu.ime || possible_interrupts == 0 {
-        return
-    }
     if cpu.halt && possible_interrupts != 0 {
         cpu.halt = false;
-        return;
+        return 0;
     }
+    if !cpu.ime || possible_interrupts == 0 {
+        return 0;
+    }
+
 
     // interrupts are handled right to left
     let priority = possible_interrupts.trailing_zeros();
@@ -35,6 +36,7 @@ pub fn handle_interrupts(cpu: &mut Cpu, memory: &mut Memory) {
     // unset this interrupt bit
     let new_interrupt = interrupts_called & !(1<<priority);
     memory.write(INTERRUPT_F_ADDRESS, new_interrupt);
+    return 20;
 }
 
 /// this handles all the opcodes for the gameboy. It returns the number of T-cycles which were used to 
@@ -129,7 +131,9 @@ fn unprefixed_opcode(cpu: &mut Cpu, mem: &mut Memory, opcode: u8) -> u8 {
             }
             if mem.read(INTERRUPT_E_ADDRESS) & mem.read(INTERRUPT_F_ADDRESS) == 0 { 
                 cpu.halt = true; 
-            } 
+            }
+            // halt bug occured
+
             return 4
         },
         0x40..=0x7F => {

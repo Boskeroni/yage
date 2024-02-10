@@ -67,24 +67,22 @@ impl Memory {
             self.mem[JOYPAD_ADDRESS] |= data & 0xF0;
             return;
         }
-
         if address == 0xFF46 {
             process_dma(self, data);
         }
-
-        // only the second bit of the stat register matter
-        let blocker = self.mem[0xFF41] & 0b0000_0011;
-        if blocker == 2 && is_within_oam(address) {
-            return;
-        } else if blocker == 3 && (is_within_oam(address) || is_within_vram(address)) {
-            return;
-        }
-
         // the internal DIV 
         if address == 0xFF04 {
             self.div = 0;
             self.mem[0xFF04] = 0x00;
             return;
+        }
+
+        // only the second bit of the stat register matter
+        let blocker = self.mem[0xFF41] & 0b0000_0011;
+        match (blocker, is_within_oam(address), is_within_vram(address)) {
+            (2, true, _) => return,
+            (3, true, true) => return,
+            _ => {}
         }
 
         self.mem[address] = data;
@@ -116,12 +114,12 @@ impl Memory {
 
         // only the second bit of the stat register matter
         let blocker = self.mem[0xFF41] & 0b0000_0011;
-        if blocker == 2 && is_within_oam(address) {
-            return 0xFF;
-        } else if blocker == 3 && (is_within_oam(address) || is_within_vram(address)) {
-            return 0xFF;
+        match (blocker, is_within_oam(address), is_within_vram(address)) {
+            (2, true, _) => return 0xFF,
+            (3, true, true) => return 0xFF,
+            _ => {}
         }
-
+        
         self.mem[address]
     }
 
