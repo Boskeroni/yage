@@ -62,6 +62,10 @@ impl Memory {
             return;
         }
 
+        if address == 0xFF40 && data & 0b1000_0000 == 0 {
+            self.mem[0xFF41] &= 0b1111_1100;
+            self.mem[0xFF44] = 0;
+        }
         // only the upper bits of joypad register are writable
         if address == JOYPAD_ADDRESS {
             self.mem[JOYPAD_ADDRESS] &=  0x0F;
@@ -98,6 +102,10 @@ impl Memory {
         self.write(address+1, (data >> 8) as u8);
     }
 
+    pub fn unchecked_read(&self, address: u16) -> u8 {
+        return self.mem[address as usize];
+    }
+
     /// reads from memory
     pub fn read(&self, address: u16) -> u8 {
         let address = address as usize;
@@ -113,7 +121,6 @@ impl Memory {
             (3, true, true) => return 0xFF,
             _ => {}
         }
-        
         self.mem[address]
     }
 

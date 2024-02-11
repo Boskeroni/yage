@@ -8,7 +8,7 @@ pub const BLANK_PIXEL: u8 = 4;
 
 #[inline]
 fn stat_interrupt(mem: &mut Memory, interrupt_index: u8, mode: u8) {
-    let mut stat = mem.read(PpuRegisters::STAT as u16);
+    let mut stat = mem.unchecked_read(PpuRegisters::STAT as u16);
     stat &= 0b1111_1100;
     stat |= mode;
     mem.write(PpuRegisters::STAT as u16, stat);
@@ -18,11 +18,11 @@ fn stat_interrupt(mem: &mut Memory, interrupt_index: u8, mode: u8) {
         return;
     }
     if stat & (1<<interrupt_index) != 0 {
-        let interrupt_flag = mem.read(INTERRUPT_F_ADDRESS as u16);
+        let interrupt_flag = mem.unchecked_read(INTERRUPT_F_ADDRESS as u16);
         mem.write(INTERRUPT_F_ADDRESS as u16, interrupt_flag|0b0000_0010);
     }
     if mode == 1 {
-        let i_flag = mem.read(INTERRUPT_F_ADDRESS as u16);
+        let i_flag = mem.unchecked_read(INTERRUPT_F_ADDRESS as u16);
         mem.write(INTERRUPT_F_ADDRESS as u16, i_flag|1);
     }
 }
@@ -64,16 +64,21 @@ impl Ppu {
 pub fn update_ppu(ppu: &mut Ppu, mem: &mut Memory, ticks: u8) -> Option<Vec<u8>> {
     use PpuState::*;
 
+    let lcdc = mem.unchecked_read(PpuRegisters::LCDC as u16);
+    if lcdc & 0b1000_0000 == 0 {
+        return None;
+    }
+
     // lyc == ly check should be done right at the start
     if ppu.ticks == 0 {
-        let mut stat = mem.read(PpuRegisters::STAT as u16);
-        let condition_met = mem.read(PpuRegisters::LY as u16) == mem.read(PpuRegisters::LYC as u16);
+        let mut stat = mem.unchecked_read(PpuRegisters::STAT as u16);
+        let condition_met = mem.unchecked_read(PpuRegisters::LY as u16) == mem.unchecked_read(PpuRegisters::LYC as u16);
 
         stat &= 0b1111_1011;
         stat |= (condition_met as u8) << 2;
 
         if stat & 0b0100_0000 != 0 && condition_met {
-            let interrupt_flag = mem.read(INTERRUPT_F_ADDRESS);
+            let interrupt_flag = mem.unchecked_read(INTERRUPT_F_ADDRESS);
             mem.write(INTERRUPT_F_ADDRESS, interrupt_flag|0b0000_0010);
         }
         mem.write(PpuRegisters::STAT as u16, stat);
@@ -100,7 +105,7 @@ pub fn update_ppu(ppu: &mut Ppu, mem: &mut Memory, ticks: u8) -> Option<Vec<u8>>
             if ppu.ticks < HBLANK_CYCLES {
                 return None;
             }
-            let ly = mem.read(PpuRegisters::LY as u16);
+            let ly = mem.unchecked_read(PpuRegisters::LY as u16);
             mem.write(PpuRegisters::LY as u16, ly+1);
             ppu.line_reset();
             
@@ -127,14 +132,9 @@ pub fn update_ppu(ppu: &mut Ppu, mem: &mut Memory, ticks: u8) -> Option<Vec<u8>>
 
 fn draw(ppu: &mut Ppu, mem: &mut Memory) -> Vec<u8> {
     // this bit in the middle will do all the drawing
-    let lcdc = mem.read(PpuRegisters::LCDC as u16);
-    let ly = mem.read(PpuRegisters::LY as u16);
-    // the screen is just off
-    if lcdc & 0b1000_0000 == 0 {
-        stat_interrupt(mem, 0, 0);
-        ppu.state = PpuState::HBlank;
-        return vec![BLANK_PIXEL; 160];
-    }
+    let lcdc = mem.unchecked_read(PpuRegisters::LCDC as u16);
+    let ly = mem.unchecked_read(PpuRegisters::LY as u16);
+
     // the number of pixels pushed to the lcd
     let mut screen_pixels: Vec<u8> = Vec::new();
 
@@ -142,11 +142,11 @@ fn draw(ppu: &mut Ppu, mem: &mut Memory) -> Vec<u8> {
     let window_pixels = draw_window(ppu, mem, lcdc, ly);
 
     // also the palle
-    let bg_palette = mem.read(PpuRegisters::BGP as u16);
+    let bg_palette = mem.unchecked_read(PpuRegisters::BGP as u16);
 
     let sprite_pixels = draw_sprites(mem, lcdc, ly);
-    let sprite_palette_0 = mem.read(PpuRegisters::OBP0 as u16);
-    let sprite_palette_1 = mem.read(PpuRegisters::OBP1 as u16);
+    let sprite_palette_0 = mem.unchecked_read(PpuRegisters::OBP0 as u16);
+    let sprite_palette_1 = mem.unchecked_read(PpuRegisters::OBP1 as u16);
 
 
     // each pixel is decided sequentially
@@ -264,8 +264,8 @@ fn draw_window(ppu: &mut Ppu, mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
         return vec![BLANK_PIXEL; 160];
     }
 
-    let wy = mem.read(PpuRegisters::WY as u16);
-    let wx = mem.read(PpuRegisters::WX as u16);
+    let wy = mem.unchecked_read(PpuRegisters::WY as u16);
+    let wx = mem.unchecked_read(PpuRegisters::WX as u16);
 
     // the window will display just not on this line yet
     // or too far to the right to be displayed
@@ -313,13 +313,13 @@ fn draw_background(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
     let addressing: u16 = if lcdc & 0b0001_0000 != 0 { 0x8000 } else { 0x8800 };
 
     // this is the line of the background which we are drawing
-    let background_line = ly.wrapping_add(mem.read(PpuRegisters::SCY as u16));
+    let background_line = ly.wrapping_add(mem.unchecked_read(PpuRegisters::SCY as u16));
 
     // which row of tile indexes in the background are used
     let bg_tile_row = background_line as u16 / 8;
     let tile_row = background_line as usize % 8;
 
-    let scx = mem.read(PpuRegisters::SCX as u16) as u16;
+    let scx = mem.unchecked_read(PpuRegisters::SCX as u16) as u16;
 
     // drawing all of the tiles
     let mut tile_number = 0;
