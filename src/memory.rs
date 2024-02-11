@@ -57,6 +57,7 @@ impl Memory {
     /// eventually implement them
     pub fn write(&mut self, address: u16, data: u8) {
         let address = address as usize;
+        // doesnt handle MBC's yet
         if address < 0x8000 {
             return;
         }
@@ -69,20 +70,13 @@ impl Memory {
         }
         if address == 0xFF46 {
             process_dma(self, data);
+            return;
         }
         // the internal DIV 
         if address == 0xFF04 {
             self.div = 0;
             self.mem[0xFF04] = 0x00;
             return;
-        }
-
-        // only the second bit of the stat register matter
-        let blocker = self.mem[0xFF41] & 0b0000_0011;
-        match (blocker, is_within_oam(address), is_within_vram(address)) {
-            (2, true, _) => return,
-            (3, true, true) => return,
-            _ => {}
         }
 
         self.mem[address] = data;
@@ -130,7 +124,7 @@ impl Memory {
 
     pub fn oam_search(&self, index: u8) -> [u8; 4] {
         // the start of oam plus the index spacing
-        let start = 0xFE00 + index as usize * 4;
+        let start = 0xFE00 + (index as usize * 4);
         (self.mem[start], self.mem[start+1], self.mem[start+2], self.mem[start+3]).try_into().unwrap()
     }
 
@@ -169,7 +163,7 @@ impl Memory {
 
 fn process_dma(mem: &mut Memory, address: u8) {
     let real_address = (address as usize) << 8;
-    for i in 0..=0xFF {
+    for i in 0..=0x9F {
         mem.mem[0xFE00+i] = mem.mem[real_address+i];
     }
 }

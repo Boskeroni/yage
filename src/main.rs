@@ -7,6 +7,8 @@ mod timer;
 mod util;
 mod args;
 
+use std::{fs::File, io::Write};
+
 use clap::Parser;
 use macroquad::prelude::*;
 
@@ -16,6 +18,13 @@ use memory::Memory;
 use processor::{run, handle_interrupts};
 use timer::update_timer;
 use util::INTERRUPT_F_ADDRESS;
+
+fn misc_inputs(mem: &Memory) {
+    if is_key_down(KeyCode::Q) {
+        let mut debug_file = File::create("debug.gb").unwrap();
+        debug_file.write_all(&mem.mem).unwrap();
+    }
+}
 
 pub fn joypad_interrupt(mem: &mut Memory) {
     let mut interrupt = false;
@@ -123,7 +132,8 @@ async fn main() {
             if let Some(line) = update_ppu(&mut ppu, &mut memory, cycles) {
                 pixel_buffer.extend::<Vec<u8>>(line);
             }
-        } 
+        }
+        misc_inputs(&memory);
         // all of the actual rendering to the screen
         for (j, pixel) in pixel_buffer.iter().enumerate() {
             let pixel = to_screen_pixel(*pixel);

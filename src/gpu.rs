@@ -148,33 +148,42 @@ fn draw(ppu: &mut Ppu, mem: &mut Memory) -> Vec<u8> {
         let sprite_pixel = sprite_pixels[i];
         let bg_pixel = background_pixels[i];
 
-        if sprite_pixel&0b1000_0000 == 0 {
-            if sprite_pixel != 0 && sprite_pixel != BLANK_PIXEL {
-                let palette_id = sprite_pixel&0b0001_0000==0;
-                let palette = if palette_id { sprite_palette_0 } else { sprite_palette_1} ;
-                screen_pixels.push(to_palette(sprite_pixel&3, palette));
-                continue;
-            }
-            if win_pixel != BLANK_PIXEL {
-                screen_pixels.push(to_palette(win_pixel, bg_palette));
-                continue;
-            }
-            screen_pixels.push(to_palette(bg_pixel, bg_palette));
-            continue;
-        }
+        let sprite_pallete_i = sprite_pixel & 0b0001_0000 == 0;
+        let sprite_pallete = match sprite_pallete_i {
+            true => sprite_palette_0,
+            false => sprite_palette_1,
+        };
 
-        // the sprite is not the priority
-        if window_pixels[i] != BLANK_PIXEL {
-            screen_pixels.push(to_palette(win_pixel, bg_palette));
+        // sprite pixel is the priority
+        if sprite_pixel & 0b1000_0000 == 0 {
+            let sprite_color = sprite_pixel & 0b0000_0011;
+
+            // empty
+            if sprite_color == 0 || sprite_color == BLANK_PIXEL {
+                if win_pixel != 0 && win_pixel != BLANK_PIXEL {
+                    screen_pixels.push(to_palette(win_pixel, bg_palette));
+                    continue;
+                }
+                screen_pixels.push(to_palette(bg_pixel, bg_palette));
+                continue;
+            }
+            screen_pixels.push(to_palette(sprite_color, sprite_pallete));
             continue;
         }
-        if bg_pixel != 0 {
-            screen_pixels.push(to_palette(bg_pixel, bg_palette));
+        if sprite_pixel == BLANK_PIXEL {
+            screen_pixels.push(match win_pixel {
+                BLANK_PIXEL => to_palette(bg_pixel, bg_palette),
+                _ => to_palette(win_pixel, bg_palette),
+            });
             continue;
         }
-        let palette_id = sprite_pixel&0b0001_0000==0;
-        let palette = if palette_id { sprite_palette_0 } else { sprite_palette_1 };
-        screen_pixels.push(to_palette(sprite_pixel&3, palette));
+        // there is a sprite pixel, but 1-3 of bg & window draw over it
+        screen_pixels.push(match (win_pixel, bg_pixel) {
+            (BLANK_PIXEL, BLANK_PIXEL) => to_palette(sprite_pixel&3, sprite_pallete),
+            (_, BLANK_PIXEL) => to_palette(win_pixel, bg_palette),
+            (BLANK_PIXEL, _) => to_palette(bg_pixel, bg_palette),
+            _ => to_palette(win_pixel, bg_palette),
+        });
     }
     return screen_pixels;
 }
@@ -198,11 +207,9 @@ fn draw_sprites(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
 
         oam_buffer.push(oam_sprite);
         if oam_buffer.len() == 10 {
-            println!("ten items found");
             break; // only the first ten items are wanted
         }
     }
-    // sorting by their x-positions so that conflicts are removed
     oam_buffer.sort_by(|a, b| a[1].cmp(&b[1]));
 
     let mut sprite_pixels = vec![BLANK_PIXEL; 300]; // 160 (length of lcd + 8x2 pad)
@@ -243,6 +250,7 @@ fn draw_window(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
     let wx = mem.read(PpuRegisters::WX as u16);
 
     // the window will display just not on this line yet
+    // or too far to the right to be displayed
     if wy > ly || wx > 167 {
         return vec![BLANK_PIXEL; 160];
     }
