@@ -44,13 +44,19 @@ enum PpuState {
 pub struct Ppu {
     ticks: usize,
     state: PpuState,
+    window_line: usize
 }
-impl Default for Ppu {
-    fn default() -> Self {
+impl Ppu {
+    pub fn default() -> Self {
         Self {
             ticks: 0,
             state: PpuState::Oam,
+            window_line: 0,
         }
+    }
+    pub fn line_reset(&mut self) {
+        self.state = PpuState::Oam;
+        self.ticks = 0;
     }
 }
 
@@ -96,7 +102,7 @@ pub fn update_ppu(ppu: &mut Ppu, mem: &mut Memory, ticks: u8) -> Option<Vec<u8>>
             }
             let ly = mem.read(PpuRegisters::LY as u16);
             mem.write(PpuRegisters::LY as u16, ly+1);
-            *ppu = Ppu::default();
+            ppu.line_reset();
             
             if ly == 143 {
                 stat_interrupt(mem, STAT_VBLANK, 1);
@@ -118,6 +124,7 @@ pub fn update_ppu(ppu: &mut Ppu, mem: &mut Memory, ticks: u8) -> Option<Vec<u8>>
     }
     return None;
 }
+
 fn draw(ppu: &mut Ppu, mem: &mut Memory) -> Vec<u8> {
     // this bit in the middle will do all the drawing
     let lcdc = mem.read(PpuRegisters::LCDC as u16);
@@ -132,7 +139,7 @@ fn draw(ppu: &mut Ppu, mem: &mut Memory) -> Vec<u8> {
     let mut screen_pixels: Vec<u8> = Vec::new();
 
     let background_pixels = draw_background(mem, lcdc, ly);
-    let window_pixels = draw_window(mem, lcdc, ly);
+    let window_pixels = draw_window(ppu, mem, lcdc, ly);
 
     // also the palle
     let bg_palette = mem.read(PpuRegisters::BGP as u16);
@@ -193,6 +200,7 @@ fn draw_sprites(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
     if lcdc & 0b0000_0010 == 0 {
         return vec![BLANK_PIXEL; 160];
     }
+    let obj_size = if lcdc & 0b0000_0100 == 0 { 8 } else { 16 };
 
     // oam scan
     let mut oam_buffer = Vec::new();
@@ -203,7 +211,7 @@ fn draw_sprites(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
             continue;
         }
         else if ly < oam_sprite[0] { continue; } // ly+16 must be greater than or equal to sprite y-position
-        else if ly >= oam_sprite[0] + 8 { continue; } // ly+16 must be less than sprite y-position + sprite height
+        else if ly >= oam_sprite[0] + obj_size { continue; } // ly+16 must be less than sprite y-position + sprite height
 
         oam_buffer.push(oam_sprite);
         if oam_buffer.len() == 10 {
@@ -214,7 +222,17 @@ fn draw_sprites(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
 
     let mut sprite_pixels = vec![BLANK_PIXEL; 300]; // 160 (length of lcd + 8x2 pad)
     for sprite in oam_buffer {
-        let mut tile_data = mem.read_tile(0x8000 + (sprite[2] as u16*16));
+        let tile_index;
+        if obj_size == 16 {
+            let base_tile_index = sprite[2] & 0b1111_1110;
+            let used_tile = ly > sprite[0] + 8;
+            let reversed = sprite[3] & 0b0100_0000 != 0;
+            tile_index = base_tile_index | if reversed {!used_tile as u8} else {used_tile as u8};
+        } else {
+            tile_index = sprite[2];
+        }
+
+        let mut tile_data = mem.read_tile(0x8000 + (tile_index as u16*16));
         if sprite[3] & 0b0100_0000 != 0 {
             tile_data.reverse();
         }
@@ -240,7 +258,7 @@ fn draw_sprites(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
     sprite_pixels[8..168].to_vec()
 }
 
-fn draw_window(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
+fn draw_window(ppu: &mut Ppu, mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
     // the window just isnt drawing
     if lcdc & 0b0010_0001 != 0b0010_0001 {
         return vec![BLANK_PIXEL; 160];
@@ -261,12 +279,11 @@ fn draw_window(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
     let mut window_pixels: Vec<u8> = vec![BLANK_PIXEL; wx as usize];
 
     // 0 = top layer, 1 = second to top, 2=...
-    let layer_shown = (wy - ly) as usize;
-    let tile_row = layer_shown as u16 / 8;
-    let starting_address = map_address + (tile_row/8)*32;
+    let layer_shown = ppu.window_line;
+    ppu.window_line = ppu.window_line + 1;
 
+    let starting_address = (map_address + (layer_shown/8)*32) as u16;
     let mut tile_number = 0;
-
     'window: loop {
         // dont need to bother with wrapping as windows do not wrap
         let tile_address = starting_address + tile_number;
