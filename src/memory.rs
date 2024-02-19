@@ -2,6 +2,7 @@ use core::panic;
 
 use rand::{distributions::Standard, Rng};
 use crate::joypad;
+use crate::mbc::{create_mbc, MBC};
 use crate::util::{little_endian_combine, JOYPAD_ADDRESS};
 use crate::util::NINTENDO_LOGO;
 
@@ -12,8 +13,9 @@ fn random_padding(amount: usize) -> Vec<u8> {
 }
 
 pub struct Memory {
-    pub mem: Vec<u8>,
-    pub div: u8,
+    mem: Vec<u8>,
+    mbc: MBC,
+    div: u8,
 }
 impl Memory {
     pub fn new(rom: Vec<u8>, booted: bool) -> Self {
@@ -40,16 +42,12 @@ impl Memory {
     }
 
     fn new_unbooted(rom: Vec<u8>) -> Self {
-        if rom.len() != 0x8000 {
-            panic!("not going to handle these yet");
-        }
-        let mut memory = rom;
-        let padding_amount = 0xFE00 - memory.len();
-        let padding_vec = random_padding(padding_amount);
-        memory.extend(padding_vec);
+        let mut memory = random_padding(0xFE00);
         memory.extend(vec![0; 0x200]);
 
-        Self { mem: memory, div: 0 }
+        let mbc = create_mbc(&rom);
+
+        Self { mem: memory, div: 0, mbc }
     }
 
     /// this completes a write to memory and follows the rules of writing
@@ -57,14 +55,19 @@ impl Memory {
     /// eventually implement them
     pub fn write(&mut self, address: u16, data: u8) {
         let address = address as usize;
-        // doesnt handle MBC's yet
-        if address < 0x8000 {
+        if is_within_rom(address) {
+            self.mbc.write_rom_bank(address, data);
+            return;
+        }
+        if is_within_ram(address) {
+            self.mbc.write_ram_bank(address, data);
             return;
         }
 
         if address == 0xFF40 && data & 0b1000_0000 == 0 {
             self.mem[0xFF41] &= 0b1111_1100;
             self.mem[0xFF44] = 0;
+            return;
         }
         // only the upper bits of joypad register are writable
         if address == JOYPAD_ADDRESS {
@@ -90,9 +93,6 @@ impl Memory {
             self.mem[address-0x2000] = data;
         }
     }
-    pub fn unchecked_write(&mut self, address: u16, data: u8) {
-        self.mem[address as usize] = data;
-    }
 
     /// this follows the little endian encoding which th gameboy follows. 
     /// the lower byte gets sent to the lower memory address index.
@@ -110,6 +110,13 @@ impl Memory {
     pub fn read(&self, address: u16) -> u8 {
         let address = address as usize;
 
+        if is_within_rom(address) {
+            return self.mbc.read_rom_bank(address);
+        }
+        if is_within_ram(address) {
+            return self.mbc.read_ram_bank(address);
+        }
+
         if address == JOYPAD_ADDRESS as usize {
             return joypad(self.mem[JOYPAD_ADDRESS]);
         }
@@ -119,9 +126,8 @@ impl Memory {
         match (blocker, is_within_oam(address), is_within_vram(address)) {
             (2, true, _) => return 0xFF,
             (3, true, true) => return 0xFF,
-            _ => {}
+            _ => return self.mem[address]
         }
-        self.mem[address]
     }
 
     /// just makes reading 16-bits of data more convenient
@@ -180,4 +186,60 @@ fn is_within_oam(index: usize) -> bool {
 }
 fn is_within_vram(index: usize) -> bool {
     return index >= 0x8000 && index <= 0x9FFF
+}
+fn is_within_rom(index: usize) -> bool {
+    return index <= 0x7FFF;
+}
+fn is_within_ram(index: usize) -> bool {
+    return index >= 0xA000 && index <= 0xBFFF
+}
+
+use crate::util::TimerRegisters;
+use crate::util::INTERRUPT_F_ADDRESS;
+
+pub fn update_timer(memory: &mut Memory, cycles: u8) {
+    use TimerRegisters::*;
+    let tac = memory.read(TAC as u16);
+
+    let timer_enable = (tac & 0b0000_0100) != 0;
+    let bit_position = match tac & 0b0000_0011 {
+        0 => 9,
+        1 => 3,
+        2 => 5,
+        3 => 7,
+        _ => unreachable!(),
+    };
+
+    let mut whole_div = (memory.read(DIV as u16) as u16) << 8 | memory.div as u16;
+    let mut prev_edge = true;
+
+    for _ in 0..cycles {
+        // div is incremented
+        whole_div = whole_div.wrapping_add(1);
+        memory.mem[DIV as usize] = (whole_div>>8) as u8;
+
+        let anded_result = ((whole_div & 1<<bit_position)!=0)&&timer_enable;
+        if prev_edge && !anded_result {
+            // for the next cycle
+            prev_edge = anded_result;
+            
+            let tima = memory.read(TIMA as u16);
+            let (new_tima, overflow) = tima.overflowing_add(1);
+
+            if overflow {
+                // the value it resets to when overlfowing
+                let tma = memory.read(TMA as u16);
+                memory.write(TIMA as u16, tma);
+
+                //call the interrupt
+                let i_flag = memory.read(INTERRUPT_F_ADDRESS);
+                memory.write(INTERRUPT_F_ADDRESS, i_flag|0b0000_0100);
+                continue;
+            }
+            // just a normal increment
+            memory.write(TIMA as u16, new_tima);
+        }
+    }
+    // update the register as well
+    memory.div = memory.div.wrapping_add(cycles);
 }

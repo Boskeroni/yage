@@ -3,9 +3,9 @@ mod cpu;
 mod memory;
 mod opcodes;
 mod gpu;
-mod timer;
 mod util;
 mod args;
+mod mbc;
 
 use std::{fs::File, io::Write};
 
@@ -14,16 +14,14 @@ use macroquad::prelude::*;
 
 use cpu::Cpu;
 use gpu::{Ppu, update_ppu};
-use memory::Memory;
+use memory::{Memory, update_timer};
 use processor::{run, handle_interrupts};
-use timer::update_timer;
 use util::INTERRUPT_F_ADDRESS;
 
-fn misc_inputs(mem: &Memory) {
-    if is_key_down(KeyCode::Q) {
-        let mut debug_file = File::create("debug.gb").unwrap();
-        debug_file.write_all(&mem.mem).unwrap();
-    }
+/// this function is useful for debugging purposes
+/// any keybindings which I want to use will be done in this function
+fn misc_inputs(_mem: &Memory) {
+
 }
 
 pub fn joypad_interrupt(mem: &mut Memory) {
