@@ -44,9 +44,7 @@ impl Memory {
     fn new_unbooted(rom: Vec<u8>) -> Self {
         let mut memory = random_padding(0xFE00);
         memory.extend(vec![0; 0x200]);
-
         let mbc = create_mbc(&rom);
-
         Self { mem: memory, div: 0, mbc }
     }
 
@@ -103,7 +101,7 @@ impl Memory {
     }
 
     pub fn unchecked_read(&self, address: u16) -> u8 {
-        return self.mem[address as usize];
+        self.mem[address as usize]
     }
 
     /// reads from memory
@@ -124,9 +122,9 @@ impl Memory {
         // only the second bit of the stat register matter
         let blocker = self.mem[0xFF41] & 0b0000_0011;
         match (blocker, is_within_oam(address), is_within_vram(address)) {
-            (2, true, _) => return 0xFF,
-            (3, true, true) => return 0xFF,
-            _ => return self.mem[address]
+            (2, true, _) => 0xFF,
+            (3, true, true) => 0xFF,
+            _ => self.mem[address]
         }
     }
 
