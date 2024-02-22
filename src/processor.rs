@@ -205,7 +205,7 @@ fn unprefixed_opcode(cpu: &mut Cpu, mem: &mut Memory, opcode: u8) -> u8 {
         0xC6 => {let data = mem.read(cpu.regs.pc()); add(&mut cpu.regs.a, data, &mut cpu.regs.f); 8}
         0xC7 => {rst(cpu, mem, 0x00); 16},
         0xC8 => {let cycles = ret(cpu, cpu.regs.f.z(), mem); cycles},
-        0xC9 => {let cycles = ret(cpu, true, mem); cpu.ime = true; cycles}
+        0xC9 => {let cycles = ret(cpu, true, mem); cycles}
         0xCA => {let pc = cpu.regs.pc_word(); let cycles = jp(cpu, cpu.regs.f.z(), mem.read_word(pc)); cycles}
         0xCC => {let cycles = call(cpu, cpu.regs.f.z(), mem); cycles}
         0xCD => {let cycles = call(cpu, true, mem); cycles},
@@ -219,7 +219,7 @@ fn unprefixed_opcode(cpu: &mut Cpu, mem: &mut Memory, opcode: u8) -> u8 {
         0xD6 => {let data = mem.read(cpu.regs.pc()); sub(&mut cpu.regs.a, data, &mut cpu.regs.f); 8}
         0xD7 => {rst(cpu, mem, 0x10); 16}
         0xD8 => {let cycles = ret(cpu, cpu.regs.f.c(), mem); cycles},
-        0xD9 => {let cycles = ret(cpu, true, mem); cpu.scheduled_ime=true; cycles}
+        0xD9 => {let cycles = ret(cpu, true, mem); cpu.scheduled_ime=true; cpu.ime = true; cycles}
         0xDA => {let pc = cpu.regs.pc_word(); let cycles = jp(cpu, cpu.regs.f.c(), mem.read_word(pc)); cycles},
         0xDC => {let cycles = call(cpu, cpu.regs.f.c(), mem); cycles},
         0xDE => {let data = mem.read(cpu.regs.pc()); sbc(&mut cpu.regs.a, data, &mut cpu.regs.f); 8},
