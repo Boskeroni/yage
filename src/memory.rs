@@ -38,7 +38,7 @@ impl Memory {
         memory.mem[0xFF44] = 0x00;
         memory.mem[0xFF46] = 0xFF;
 
-        return memory;
+        memory
     }
 
     fn new_unbooted(rom: Vec<u8>) -> Self {
@@ -180,16 +180,16 @@ fn process_dma(mem: &mut Memory, address: u8) {
 }
 
 fn is_within_oam(index: usize) -> bool {
-    return index >= 0xFE00 && index <= 0xFE9F
+    index >= 0xFE00 && index <= 0xFE9F
 }
 fn is_within_vram(index: usize) -> bool {
-    return index >= 0x8000 && index <= 0x9FFF
+    index >= 0x8000 && index <= 0x9FFF
 }
 fn is_within_rom(index: usize) -> bool {
-    return index <= 0x7FFF;
+    index <= 0x7FFF
 }
 fn is_within_ram(index: usize) -> bool {
-    return index >= 0xA000 && index <= 0xBFFF
+    index >= 0xA000 && index <= 0xBFFF
 }
 
 use crate::util::TimerRegisters;

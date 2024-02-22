@@ -7,8 +7,6 @@ mod util;
 mod args;
 mod mbc;
 
-use std::{fs::File, io::Write};
-
 use clap::Parser;
 use macroquad::prelude::*;
 
@@ -71,11 +69,11 @@ fn serial_output(mem: &mut Memory) {
 
 fn to_screen_pixel(p: u8) -> Color {
     match p {
-        0 => return WHITE,
-        1 => return LIGHTGRAY,
-        2 => return DARKGRAY,
-        3 => return BLACK,
-        4 => return WHITE,
+        0 => WHITE,
+        1 => LIGHTGRAY,
+        2 => DARKGRAY,
+        3 => BLACK,
+        4 => WHITE,
         _ => unreachable!()
     }
 }

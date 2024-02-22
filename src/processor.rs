@@ -11,8 +11,7 @@ const VEC_ADDRESSES: [u16; 5] = [0x40, 0x48, 0x50, 0x58, 0x60];
 /// could be automatically done without needing timer updates
 pub fn handle_interrupts(cpu: &mut Cpu, memory: &mut Memory) -> u8 {
     let interrupts_called = memory.read(INTERRUPT_F_ADDRESS);
-    let interrupts_allowed = memory.read(INTERRUPT_E_ADDRESS);
-    let possible_interrupts = interrupts_called & interrupts_allowed;
+    let possible_interrupts = interrupts_called & memory.read(INTERRUPT_E_ADDRESS);
 
     if cpu.halt && possible_interrupts != 0 {
         cpu.halt = false;
@@ -46,7 +45,7 @@ pub fn run(cpu: &mut Cpu, memory: &mut Memory) -> u8 {
     let opcode = memory.read(cpu.regs.pc());
 
     let used_cycles = match opcode {
-        0xCB => prefixed_opcode(cpu, memory),
+        0xCB => {prefixed_opcode(cpu, memory); 8},
         _ => unprefixed_opcode(cpu, memory, opcode),
     };
 
@@ -54,8 +53,7 @@ pub fn run(cpu: &mut Cpu, memory: &mut Memory) -> u8 {
     if temp_ime == cpu.scheduled_ime {
         cpu.ime = cpu.scheduled_ime;
     }
-
-    return used_cycles;
+    used_cycles
 }
 
 fn unprefixed_opcode(cpu: &mut Cpu, mem: &mut Memory, opcode: u8) -> u8 {
@@ -254,7 +252,7 @@ fn unprefixed_opcode(cpu: &mut Cpu, mem: &mut Memory, opcode: u8) -> u8 {
         _ => panic!("unsupported opcode"),
     }
 }
-fn prefixed_opcode(cpu: &mut Cpu, memory: &mut Memory) -> u8 {
+fn prefixed_opcode(cpu: &mut Cpu, memory: &mut Memory) {
     fn run_operation(data: &mut u8, operation: u8, flag: &mut Flag) {
         match operation {
             0 => rlc(data, flag),
@@ -272,28 +270,17 @@ fn prefixed_opcode(cpu: &mut Cpu, memory: &mut Memory) -> u8 {
         }
     }
 
-    // the new opcode pretty much
     let opcode = memory.read(cpu.regs.pc());
-    // the register which the operation is going to be performed on
-    // selected through match statement
     let target = opcode % 8;
-    // the operation which will be performed. again used in match statement.
     let operation = opcode / 8;
-    // meaning we are changing the [hl]
+
     if target == 6 {
         let hl = cpu.regs.get_hl();
 
         let mut value = memory.read(hl);
         run_operation(&mut value, operation, &mut cpu.regs.f);
-
-        // these operations only modify one bit of the memory and so
-        // the gameboy doesnt require the full 4 cycles to run it.
-        if operation >= 8 && operation <= 15 {
-            memory.write(hl, value);
-        } else {
-            memory.write(hl, value);
-        }
-        return 0;
+        memory.write(hl, value);
+        return;
     }
     let src = match target {
         0 => &mut cpu.regs.b,
@@ -306,5 +293,4 @@ fn prefixed_opcode(cpu: &mut Cpu, memory: &mut Memory) -> u8 {
         _ => unreachable!(),
     };
     run_operation(src, operation, &mut cpu.regs.f);
-    return 0;
 }

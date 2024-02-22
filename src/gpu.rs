@@ -127,7 +127,7 @@ pub fn update_ppu(ppu: &mut Ppu, mem: &mut Memory, ticks: u8) -> Option<Vec<u8>>
             mem.write(PpuRegisters::LY as u16, 0)
         }, // waits
     }
-    return None;
+    None
 }
 
 fn draw(ppu: &mut Ppu, mem: &mut Memory) -> Vec<u8> {
@@ -192,7 +192,7 @@ fn draw(ppu: &mut Ppu, mem: &mut Memory) -> Vec<u8> {
             _ => to_palette(win_pixel, bg_palette),
         });
     }
-    return screen_pixels;
+    screen_pixels
 }
 
 fn draw_sprites(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
@@ -207,11 +207,9 @@ fn draw_sprites(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
     for i in 0..40 {
         let oam_sprite = mem.oam_search(i);
 
-        if oam_sprite[0] >= 160 || oam_sprite[0] == 0 {
-            continue;
-        }
-        else if ly < oam_sprite[0] { continue; } // ly+16 must be greater than or equal to sprite y-position
-        else if ly >= oam_sprite[0] + obj_size { continue; } // ly+16 must be less than sprite y-position + sprite height
+        if oam_sprite[0] >= 160 || oam_sprite[0] == 0 { continue; }
+        if ly < oam_sprite[0] { continue; } // ly+16 must be greater than or equal to sprite y-position
+        if ly >= oam_sprite[0] + obj_size { continue; } // ly+16 must be less than sprite y-position + sprite height
 
         oam_buffer.push(oam_sprite);
         if oam_buffer.len() == 10 {
@@ -299,7 +297,7 @@ fn draw_window(ppu: &mut Ppu, mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
         }
         tile_number += 1;
     }
-    return window_pixels[7..].to_vec();
+    window_pixels[7..].to_vec()
 }
 
 fn draw_background(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
@@ -337,7 +335,7 @@ fn draw_background(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
         }
         tile_number += 1;
     }
-    return background_pixels[((scx%8) as usize)..].to_vec();
+    background_pixels[((scx%8) as usize)..].to_vec()
 }
 
 fn get_individual_pixels(tile_row: u16) -> Vec<u8> {
@@ -345,5 +343,5 @@ fn get_individual_pixels(tile_row: u16) -> Vec<u8> {
     for i in (0..8).rev() {
         pixels.push((tile_row >> (i*2) & 3) as u8);
     }
-    return pixels
+    pixels
 }
