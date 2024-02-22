@@ -13,7 +13,7 @@ fn random_padding(amount: usize) -> Vec<u8> {
 }
 
 pub struct Memory {
-    mem: Vec<u8>,
+    pub mem: Vec<u8>,
     mbc: MBC,
     div: u8,
 }
@@ -61,7 +61,6 @@ impl Memory {
             self.mbc.write_ram_bank(address, data);
             return;
         }
-
         if address == 0xFF40 && data & 0b1000_0000 == 0 {
             self.mem[0xFF41] &= 0b1111_1100;
             self.mem[0xFF44] = 0;
@@ -197,7 +196,7 @@ use crate::util::INTERRUPT_F_ADDRESS;
 
 pub fn update_timer(memory: &mut Memory, cycles: u8) {
     use TimerRegisters::*;
-    let tac = memory.read(TAC as u16);
+    let tac = memory.mem[TAC as usize];
 
     let timer_enable = (tac & 0b0000_0100) != 0;
     let bit_position = match tac & 0b0000_0011 {
@@ -208,7 +207,7 @@ pub fn update_timer(memory: &mut Memory, cycles: u8) {
         _ => unreachable!(),
     };
 
-    let mut whole_div = (memory.read(DIV as u16) as u16) << 8 | memory.div as u16;
+    let mut whole_div = (memory.mem[DIV as usize] as u16) << 8 | memory.div as u16;
     let mut prev_edge = true;
 
     for _ in 0..cycles {
@@ -221,21 +220,21 @@ pub fn update_timer(memory: &mut Memory, cycles: u8) {
             // for the next cycle
             prev_edge = anded_result;
             
-            let tima = memory.read(TIMA as u16);
+            let tima = memory.mem[TIMA as usize];
             let (new_tima, overflow) = tima.overflowing_add(1);
 
             if overflow {
                 // the value it resets to when overlfowing
-                let tma = memory.read(TMA as u16);
-                memory.write(TIMA as u16, tma);
+                let tma = memory.mem[TMA as usize];
+                memory.mem[TIMA as usize] = tma;
 
                 //call the interrupt
-                let i_flag = memory.read(INTERRUPT_F_ADDRESS);
-                memory.write(INTERRUPT_F_ADDRESS, i_flag|0b0000_0100);
+                let i_flag = memory.mem[INTERRUPT_F_ADDRESS as usize];
+                //memory.mem[INTERRUPT_F_ADDRESS as usize] = i_flag|0b0000_0100;
                 continue;
             }
             // just a normal increment
-            memory.write(TIMA as u16, new_tima);
+            memory.mem[TIMA as usize] = new_tima;
         }
     }
     // update the register as well

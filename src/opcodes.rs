@@ -204,8 +204,8 @@ pub fn call(cpu: &mut Cpu, cc: bool, memory: &mut Memory) -> u8 {
 }
 pub fn rst(cpu: &mut Cpu, memory: &mut Memory, new: u16) {
     let fallback_address = cpu.regs.pc();
-    memory.write_word(cpu.regs.sp-2, fallback_address);
     cpu.regs.sp -= 2;
+    memory.write_word(cpu.regs.sp, fallback_address);
 
     jp(cpu, true, new);
 }

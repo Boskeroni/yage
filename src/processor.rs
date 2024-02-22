@@ -21,7 +21,6 @@ pub fn handle_interrupts(cpu: &mut Cpu, memory: &mut Memory) -> u8 {
         return 0;
     }
 
-
     // interrupts are handled right to left
     let priority = possible_interrupts.trailing_zeros();
     let address = VEC_ADDRESSES[priority as usize];
@@ -58,7 +57,7 @@ pub fn run(cpu: &mut Cpu, memory: &mut Memory) -> u8 {
 
 fn unprefixed_opcode(cpu: &mut Cpu, mem: &mut Memory, opcode: u8) -> u8 {
     match opcode {
-        0x00 => {  4}
+        0x00 => { 4 }
         0x01 => {let pc = cpu.regs.pc_word(); cpu.regs.set_bc(mem.read_word(pc)); 12},
         0x02 => {mem.write(cpu.regs.get_bc(), cpu.regs.a); 8},
         0x03 => {cpu.regs.set_bc(cpu.regs.get_bc().wrapping_add(1)); 8},

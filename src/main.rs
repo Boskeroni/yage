@@ -7,6 +7,8 @@ mod util;
 mod args;
 mod mbc;
 
+use std::{fs::File, io::Write};
+
 use clap::Parser;
 use macroquad::prelude::*;
 
@@ -121,7 +123,6 @@ async fn main() {
             if !cpu.halt {
                 cycles += run(&mut cpu, &mut memory) - 4;
             }
-
             update_timer(&mut memory, cycles);
             serial_output(&mut memory);
 
