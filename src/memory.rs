@@ -15,7 +15,7 @@ fn random_padding(amount: usize) -> Vec<u8> {
 pub struct Memory {
     pub mem: Vec<u8>,
     mbc: MBC,
-    div: u8,
+    div: u16,
 }
 impl Memory {
     pub fn new(rom: Vec<u8>, booted: bool) -> Self {
@@ -79,7 +79,6 @@ impl Memory {
         // the internal DIV 
         if address == 0xFF04 {
             self.div = 0;
-            self.mem[0xFF04] = 0x00;
             return;
         }
 
@@ -116,6 +115,9 @@ impl Memory {
 
         if address == JOYPAD_ADDRESS as usize {
             return joypad(self.mem[JOYPAD_ADDRESS]);
+        }
+        if address == 0xFF04 {
+            return (self.div >> 8) as u8;
         }
 
         // only the second bit of the stat register matter
@@ -207,15 +209,13 @@ pub fn update_timer(memory: &mut Memory, cycles: u8) {
         _ => unreachable!(),
     };
 
-    let mut whole_div = (memory.mem[DIV as usize] as u16) << 8 | memory.div as u16;
-    let mut prev_edge = true;
+    let mut prev_edge = ((memory.div & 1<<bit_position)!=0)&&timer_enable;;
 
     for _ in 0..cycles {
         // div is incremented
-        whole_div = whole_div.wrapping_add(1);
-        memory.mem[DIV as usize] = (whole_div>>8) as u8;
+        memory.div = memory.div.wrapping_add(1);
 
-        let anded_result = ((whole_div & 1<<bit_position)!=0)&&timer_enable;
+        let anded_result = ((memory.div & 1<<bit_position)!=0)&&timer_enable;
         if prev_edge && !anded_result {
             // for the next cycle
             prev_edge = anded_result;
@@ -229,14 +229,11 @@ pub fn update_timer(memory: &mut Memory, cycles: u8) {
                 memory.mem[TIMA as usize] = tma;
 
                 //call the interrupt
-                let i_flag = memory.mem[INTERRUPT_F_ADDRESS as usize];
-                //memory.mem[INTERRUPT_F_ADDRESS as usize] = i_flag|0b0000_0100;
+                memory.mem[INTERRUPT_F_ADDRESS as usize] |= 0b0000_0100;
                 continue;
             }
             // just a normal increment
             memory.mem[TIMA as usize] = new_tima;
         }
     }
-    // update the register as well
-    memory.div = memory.div.wrapping_add(cycles);
 }

@@ -7,8 +7,6 @@ mod util;
 mod args;
 mod mbc;
 
-use std::{fs::File, io::Write};
-
 use clap::Parser;
 use macroquad::prelude::*;
 
@@ -121,6 +119,7 @@ async fn main() {
             let mut cycles = 4;
             cycles += handle_interrupts(&mut cpu, &mut memory);
             if !cpu.halt {
+                // have to account for the previous 4 cycles 
                 cycles += run(&mut cpu, &mut memory) - 4;
             }
             update_timer(&mut memory, cycles);
