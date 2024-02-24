@@ -1,11 +1,10 @@
-use core::panic;
-
 use rand::{distributions::Standard, Rng};
 use crate::joypad;
 use crate::mbc::{create_mbc, MBC};
 use crate::util::{little_endian_combine, JOYPAD_ADDRESS};
 use crate::util::NINTENDO_LOGO;
-
+use crate::util::TimerRegisters;
+use crate::util::INTERRUPT_F_ADDRESS;
 
 // makes the ram random, more accurate to the gameboy
 fn random_padding(amount: usize) -> Vec<u8> {
@@ -30,7 +29,7 @@ impl Memory {
 
         memory.mem[0xFF00] = 0xFF;
         memory.mem[0xFF02] = 0x7E;
-        memory.mem[0xFF04] = 0x18;
+        memory.div = 0x1800;
         memory.mem[0xFF07] = 0xF8;
         memory.mem[0xFF0F] = 0xE1;
         memory.mem[0xFF40] = 0x91;
@@ -77,7 +76,7 @@ impl Memory {
             return;
         }
         // the internal DIV 
-        if address == 0xFF04 {
+        if address == TimerRegisters::DIV as usize {
             self.div = 0;
             return;
         }
@@ -193,9 +192,6 @@ fn is_within_ram(index: usize) -> bool {
     index >= 0xA000 && index <= 0xBFFF
 }
 
-use crate::util::TimerRegisters;
-use crate::util::INTERRUPT_F_ADDRESS;
-
 pub fn update_timer(memory: &mut Memory, cycles: u8) {
     use TimerRegisters::*;
     let tac = memory.mem[TAC as usize];
@@ -209,7 +205,7 @@ pub fn update_timer(memory: &mut Memory, cycles: u8) {
         _ => unreachable!(),
     };
 
-    let mut prev_edge = ((memory.div & 1<<bit_position)!=0)&&timer_enable;;
+    let mut prev_edge = ((memory.div & 1<<bit_position)!=0)&&timer_enable;
 
     for _ in 0..cycles {
         // div is incremented

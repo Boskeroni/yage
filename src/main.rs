@@ -85,7 +85,7 @@ fn get_rom(rom_path: &String) -> Vec<u8> {
     }
 }
 
-const SCALE_FACTOR: i32 = 2;
+const SCALE_FACTOR: i32 = 4;
 fn window_conf() -> Conf {
     Conf {
         window_title: "gameboy emulator".to_owned(),
