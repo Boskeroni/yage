@@ -124,7 +124,7 @@ async fn main() {
             }
             update_timer(&mut memory, cycles);
             serial_output(&mut memory);
-
+            
             if let Some(line) = update_ppu(&mut ppu, &mut memory, cycles) {
                 pixel_buffer.extend::<Vec<u8>>(line);
             }
