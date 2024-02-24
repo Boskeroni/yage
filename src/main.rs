@@ -7,6 +7,8 @@ mod util;
 mod args;
 mod mbc;
 
+use std::{fs::File, io::Write};
+
 use clap::Parser;
 use macroquad::prelude::*;
 
@@ -124,7 +126,9 @@ async fn main() {
             }
             update_timer(&mut memory, cycles);
             serial_output(&mut memory);
-            
+            if cpu.regs.pc == 0xC2D3 {
+                println!("weve passed the first test :)");
+            }
             if let Some(line) = update_ppu(&mut ppu, &mut memory, cycles) {
                 pixel_buffer.extend::<Vec<u8>>(line);
             }

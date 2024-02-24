@@ -197,7 +197,7 @@ fn unprefixed_opcode(cpu: &mut Cpu, mem: &mut Memory, opcode: u8) -> u8 {
         }, // {func} A, {reg}
         0xC0 => {let cycles = ret(cpu, !cpu.regs.f.z(), mem); cycles}, // RET NZ
         0xC1 => {cpu.regs.set_bc(mem.read_word(cpu.regs.sp)); cpu.regs.sp += 2; 12}, // POP BC
-        0xC2 => {let new = mem.read_word(cpu.regs.pc_word()); let cycles = jp(cpu, !cpu.regs.f.z(), new); cycles}, // JP NZ, a16
+        0xC2 => {let new = mem.read_word(cpu.regs.pc_word()); let cycles = jp(cpu, !cpu.regs.f.z(), new); println!("{:#01X}", cpu.regs.pc); cycles}, // JP NZ, a16
         0xC3 => {let new = mem.read_word(cpu.regs.pc_word()); let cycles = jp(cpu, true, new); cycles}, // JP a16
         0xC4 => {let cycles = call(cpu, !cpu.regs.f.z(), mem); cycles}, // CALL NZ, a16
         0xC5 => {mem.write_word(cpu.regs.sp-2, cpu.regs.get_bc()); cpu.regs.sp -= 2; 16}, // PUSH BC
@@ -254,7 +254,7 @@ fn prefixed_opcode(cpu: &mut Cpu, memory: &mut Memory) {
     fn run_operation(data: &mut u8, operation: u8, flag: &mut Flag) {
         match operation {
             0 => rlc(data, flag),
-           1 => rrc(data, flag),
+            1 => rrc(data, flag),
             2 => rl(data, flag),
             3 => rr(data, flag),
             4 => sla(data, flag),
@@ -262,7 +262,7 @@ fn prefixed_opcode(cpu: &mut Cpu, memory: &mut Memory) {
             6 => swap(data, flag),
             7 => srl(data, flag),
             8..=15 => bit(data, flag, operation - 8),
-           16..=23 => *data &= !(0b0000_0001 << (operation - 16)),
+            16..=23 => *data &= !(0b0000_0001 << (operation - 16)),
             24..=31 => *data |= 0b0000_0001 << (operation - 24),
             _ => unreachable!()
         }

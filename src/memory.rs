@@ -1,15 +1,9 @@
-use rand::{distributions::Standard, Rng};
 use crate::joypad;
 use crate::mbc::{create_mbc, MBC};
 use crate::util::{little_endian_combine, JOYPAD_ADDRESS};
 use crate::util::NINTENDO_LOGO;
 use crate::util::TimerRegisters;
 use crate::util::INTERRUPT_F_ADDRESS;
-
-// makes the ram random, more accurate to the gameboy
-fn random_padding(amount: usize) -> Vec<u8> {
-    rand::thread_rng().sample_iter(Standard).take(amount).collect()
-}
 
 pub struct Memory {
     pub mem: Vec<u8>,
@@ -41,10 +35,9 @@ impl Memory {
     }
 
     fn new_unbooted(rom: Vec<u8>) -> Self {
-        let mut memory = random_padding(0xFE00);
-        memory.extend(vec![0; 0x200]);
+        let memory = vec![0; 0x10000];
         let mbc = create_mbc(&rom);
-        Self { mem: memory, div: 0, mbc }
+        Self { mem: memory, div: 0x1800, mbc }
     }
 
     /// this completes a write to memory and follows the rules of writing
@@ -196,7 +189,7 @@ pub fn update_timer(memory: &mut Memory, cycles: u8) {
     use TimerRegisters::*;
     let tac = memory.mem[TAC as usize];
 
-    let timer_enable = (tac & 0b0000_0100) != 0;
+    let timer_enable = tac & 0b0000_0100 != 0;
     if !timer_enable {
         memory.div = memory.div.wrapping_add(cycles as u16);
         return;
@@ -212,28 +205,20 @@ pub fn update_timer(memory: &mut Memory, cycles: u8) {
 
     let mut prev_edge = (memory.div & 1<<bit_position)!=0;
     for _ in 0..cycles {
-        // div is incremented
         memory.div = memory.div.wrapping_add(1);
 
         let anded_result = (memory.div & 1<<bit_position)!=0;
-        if prev_edge && !anded_result {
-            // for the next cycle
-            prev_edge = anded_result;
-            
+        if prev_edge && !anded_result {            
             let tima = memory.mem[TIMA as usize];
             let (new_tima, overflow) = tima.overflowing_add(1);
+            memory.mem[TIMA as usize] = new_tima;
 
             if overflow {
-                // the value it resets to when overlfowing
-                let tma = memory.mem[TMA as usize];
-                memory.mem[TIMA as usize] = tma;
-
-                //call the interrupt
-                memory.mem[INTERRUPT_F_ADDRESS as usize] |= 0b0000_0100;
-                continue;
+                // timer gets reset to tma
+                memory.mem[TIMA as usize] = memory.mem[TMA as usize];
+                memory.mem[INTERRUPT_F_ADDRESS as usize] |= 0x04;
             }
-            // just a normal increment
-            memory.mem[TIMA as usize] = new_tima;
         }
+        prev_edge = anded_result;
     }
 }
