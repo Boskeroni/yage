@@ -197,6 +197,11 @@ pub fn update_timer(memory: &mut Memory, cycles: u8) {
     let tac = memory.mem[TAC as usize];
 
     let timer_enable = (tac & 0b0000_0100) != 0;
+    if !timer_enable {
+        memory.div = memory.div.wrapping_add(cycles as u16);
+        return;
+    }
+
     let bit_position = match tac & 0b0000_0011 {
         0 => 9,
         1 => 3,
@@ -205,13 +210,12 @@ pub fn update_timer(memory: &mut Memory, cycles: u8) {
         _ => unreachable!(),
     };
 
-    let mut prev_edge = ((memory.div & 1<<bit_position)!=0)&&timer_enable;
-
+    let mut prev_edge = (memory.div & 1<<bit_position)!=0;
     for _ in 0..cycles {
         // div is incremented
         memory.div = memory.div.wrapping_add(1);
 
-        let anded_result = ((memory.div & 1<<bit_position)!=0)&&timer_enable;
+        let anded_result = (memory.div & 1<<bit_position)!=0;
         if prev_edge && !anded_result {
             // for the next cycle
             prev_edge = anded_result;
