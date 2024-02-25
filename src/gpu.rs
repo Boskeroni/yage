@@ -167,7 +167,7 @@ fn draw(ppu: &mut Ppu, mem: &mut Memory) -> Vec<u8> {
 
             // empty
             if sprite_color == 0 || sprite_color == BLANK_PIXEL {
-                if win_pixel != 0 && win_pixel != BLANK_PIXEL {
+                if win_pixel != BLANK_PIXEL {
                     screen_pixels.push(to_palette(win_pixel, bg_palette));
                     continue;
                 }
@@ -210,8 +210,8 @@ fn draw_sprites(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
         if oam_sprite[0] >= 160 || oam_sprite[0] == 0 {
             continue;
         }
-        else if ly < oam_sprite[0] { continue; } // ly+16 must be greater than or equal to sprite y-position
-        else if ly >= oam_sprite[0] + obj_size { continue; } // ly+16 must be less than sprite y-position + sprite height
+        if ly < oam_sprite[0] { continue; } // ly+16 must be greater than or equal to sprite y-position
+        if ly >= oam_sprite[0] + obj_size { continue; } // ly+16 must be less than sprite y-position + sprite height
 
         oam_buffer.push(oam_sprite);
         if oam_buffer.len() == 10 {
@@ -225,7 +225,7 @@ fn draw_sprites(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
         let tile_index;
         if obj_size == 16 {
             let base_tile_index = sprite[2] & 0b1111_1110;
-            let used_tile = ly > sprite[0] + 8;
+            let used_tile = ly >= sprite[0] + 8;
             let reversed = sprite[3] & 0b0100_0000 != 0;
             tile_index = base_tile_index | if reversed {!used_tile as u8} else {used_tile as u8};
         } else {
@@ -246,7 +246,7 @@ fn draw_sprites(mem: &Memory, lcdc: u8, ly: u8) -> Vec<u8> {
 
         for i in 0..8 {
             let i = i as usize;
-            match sprite_pixels[i+sprite[1] as usize] {
+            match sprite_pixels[i+sprite[1] as usize]&7 {
                 0 | BLANK_PIXEL => {
                     let pixel_data = row_pixels[i] | sprite[3] & 0b1001_0000;
                     sprite_pixels[i+sprite[1] as usize] = pixel_data;
