@@ -54,11 +54,7 @@ impl Memory {
             self.mbc.write_ram(address, data);
             return;
         }
-        if address == 0xFF40 && data & 0b1000_0000 == 0 {
-            self.mem[0xFF41] &= 0b1111_1100;
-            self.mem[0xFF44] = 0;
-            return;
-        }
+
         // only the upper bits of joypad register are writable
         if address == JOYPAD_ADDRESS {
             self.mem[JOYPAD_ADDRESS] &=  0x0F;
