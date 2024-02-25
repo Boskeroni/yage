@@ -7,7 +7,7 @@ use crate::util::INTERRUPT_F_ADDRESS;
 
 pub struct Memory {
     pub mem: Vec<u8>,
-    mbc: MBC,
+    mbc: Box<dyn MBC>,
     div: u16,
 }
 impl Memory {
@@ -45,12 +45,13 @@ impl Memory {
     /// eventually implement them
     pub fn write(&mut self, address: u16, data: u8) {
         let address = address as usize;
+
         if is_within_rom(address) {
-            self.mbc.write_rom_bank(address, data);
+            self.mbc.write_rom(address, data);
             return;
         }
         if is_within_ram(address) {
-            self.mbc.write_ram_bank(address, data);
+            self.mbc.write_ram(address, data);
             return;
         }
         if address == 0xFF40 && data & 0b1000_0000 == 0 {
@@ -99,10 +100,10 @@ impl Memory {
         let address = address as usize;
 
         if is_within_rom(address) {
-            return self.mbc.read_rom_bank(address);
+            return self.mbc.read_rom(address);
         }
         if is_within_ram(address) {
-            return self.mbc.read_ram_bank(address);
+            return self.mbc.read_ram(address);
         }
 
         if address == JOYPAD_ADDRESS as usize {

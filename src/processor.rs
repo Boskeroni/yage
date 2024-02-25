@@ -1,6 +1,5 @@
 use crate::memory::Memory;
 use crate::cpu::*;
-
 use crate::opcodes::*;
 use crate::util::INTERRUPT_E_ADDRESS;
 use crate::util::INTERRUPT_F_ADDRESS;
@@ -197,7 +196,7 @@ fn unprefixed_opcode(cpu: &mut Cpu, mem: &mut Memory, opcode: u8) -> u8 {
         }, // {func} A, {reg}
         0xC0 => {let cycles = ret(cpu, !cpu.regs.f.z(), mem); cycles}, // RET NZ
         0xC1 => {cpu.regs.set_bc(mem.read_word(cpu.regs.sp)); cpu.regs.sp += 2; 12}, // POP BC
-        0xC2 => {let new = mem.read_word(cpu.regs.pc_word()); let cycles = jp(cpu, !cpu.regs.f.z(), new); println!("{:#01X}", cpu.regs.pc); cycles}, // JP NZ, a16
+        0xC2 => {let new = mem.read_word(cpu.regs.pc_word()); let cycles = jp(cpu, !cpu.regs.f.z(), new); cycles}, // JP NZ, a16
         0xC3 => {let new = mem.read_word(cpu.regs.pc_word()); let cycles = jp(cpu, true, new); cycles}, // JP a16
         0xC4 => {let cycles = call(cpu, !cpu.regs.f.z(), mem); cycles}, // CALL NZ, a16
         0xC5 => {mem.write_word(cpu.regs.sp-2, cpu.regs.get_bc()); cpu.regs.sp -= 2; 16}, // PUSH BC

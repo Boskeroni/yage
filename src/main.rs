@@ -7,16 +7,14 @@ mod util;
 mod args;
 mod mbc;
 
-use std::{fs::File, io::Write};
-
-use clap::Parser;
-use macroquad::prelude::*;
-
 use cpu::Cpu;
 use gpu::{Ppu, update_ppu};
 use memory::{Memory, update_timer};
 use processor::{run, handle_interrupts};
 use util::INTERRUPT_F_ADDRESS;
+
+use clap::Parser;
+use macroquad::prelude::*;
 
 /// this function is useful for debugging purposes
 /// any keybindings which I want to use will be done in this function
@@ -126,9 +124,7 @@ async fn main() {
             }
             update_timer(&mut memory, cycles);
             serial_output(&mut memory);
-            if cpu.regs.pc == 0xC2D3 {
-                println!("weve passed the first test :)");
-            }
+
             if let Some(line) = update_ppu(&mut ppu, &mut memory, cycles) {
                 pixel_buffer.extend::<Vec<u8>>(line);
             }
