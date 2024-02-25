@@ -186,9 +186,9 @@ fn draw(ppu: &mut Ppu, mem: &mut Memory) -> Vec<u8> {
         }
         // there is a sprite pixel, but 1-3 of bg & window draw over it
         screen_pixels.push(match (win_pixel, bg_pixel) {
-            (BLANK_PIXEL, BLANK_PIXEL) => to_palette(sprite_pixel&3, sprite_pallete),
-            (_, BLANK_PIXEL) => to_palette(win_pixel, bg_palette),
-            (BLANK_PIXEL, _) => to_palette(bg_pixel, bg_palette),
+            (0|BLANK_PIXEL, 0|BLANK_PIXEL) => to_palette(sprite_pixel&3, sprite_pallete),
+            (_, 0|BLANK_PIXEL) => to_palette(win_pixel, bg_palette),
+            (0|BLANK_PIXEL, _) => to_palette(bg_pixel, bg_palette),
             _ => to_palette(win_pixel, bg_palette),
         });
     }
